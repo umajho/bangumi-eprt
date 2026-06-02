@@ -10,6 +10,7 @@ import {
   DEFAULT_AUTH_ENTRYPOINT,
   EPRT_ID_HTML_SAFE,
   LEGACY_SEARCH_PARAMS_KEY_TOKEN_COUPON,
+  LOCAL_STORAGE_KEY_SESSION_TOKEN,
   // LOCAL_STORAGE_KEY_SESSION_TOKEN,
 } from "./definitions";
 import { processEpPage } from "./page-processors/ep";
@@ -118,21 +119,17 @@ async function main() {
   }
 }
 
-/**
- * TODO: 在确认好从空白状态开始 auth 相关的功能是否正常之后，再考虑实现迁移 auth
- * 相关本地存储的事情。
- */
 async function migrate() {
-  // const LEGACI_LOCAL_STORAGE_KEY_SESSION_TOKEN = "bgm_ep_ratings_token";
-  // const LEGACY_LOCAL_STORAGE_KEY_ACCESS_TOKEN = "bgm_ep_ratings_jwt";
+  const LEGACI_LOCAL_STORAGE_KEY_SESSION_TOKEN = "bgm_ep_ratings_token";
+  const LEGACY_LOCAL_STORAGE_KEY_ACCESS_TOKEN = "bgm_ep_ratings_jwt";
 
-  // const legacy_session_token = localStorage
-  //   .getItem(LEGACI_LOCAL_STORAGE_KEY_SESSION_TOKEN);
-  // if (legacy_session_token) {
-  //   localStorage.setItem(LOCAL_STORAGE_KEY_SESSION_TOKEN, legacy_session_token);
-  //   localStorage.removeItem(LEGACI_LOCAL_STORAGE_KEY_SESSION_TOKEN);
-  //   localStorage.removeItem(LEGACY_LOCAL_STORAGE_KEY_ACCESS_TOKEN);
-  // }
+  const legacy_session_token = localStorage
+    .getItem(LEGACI_LOCAL_STORAGE_KEY_SESSION_TOKEN);
+  if (legacy_session_token) {
+    localStorage.setItem(LOCAL_STORAGE_KEY_SESSION_TOKEN, legacy_session_token);
+    localStorage.removeItem(LEGACI_LOCAL_STORAGE_KEY_SESSION_TOKEN);
+    localStorage.removeItem(LEGACY_LOCAL_STORAGE_KEY_ACCESS_TOKEN);
+  }
 }
 
 function setUpAuthRelatedStuff({ authStore }: { authStore: AuthStore }) {
