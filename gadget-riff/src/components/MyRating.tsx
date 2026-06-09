@@ -27,6 +27,7 @@ import { PleaseDoAuth, PleaseDoRefetch } from "./PleaseDoAuth";
 import { cls } from "../utils/cls";
 import { ErrorMessageWithRetry } from "./errors";
 import { Tooltip } from "./Tooltip";
+import { readonlyPageData } from "../stores/readonly-page-data";
 
 const TAG_NAME = makeCustomElementTagName("my-rating");
 
@@ -165,6 +166,7 @@ export const MyRating: Component<{
       return { requiring_auth: true };
     }
   })());
+  const [claimedScore, setClaimedScore] = createSignal<Score | null>(null);
 
   function queryEpisodeDataTracked(opts: { shouldRefetch: boolean }) {
     return props.scoreStore.queryEpisodeDataTracked(
@@ -200,15 +202,22 @@ export const MyRating: Component<{
               ? { requiring_fetch: true }
               : { requiring_auth: true },
           );
+          const score = Object.entries(epData.publicVotersByScore ?? [])
+            .find(([_, voters]) =>
+              voters.includes(readonlyPageData.claimedUserId!)
+            )?.[0];
+          setClaimedScore(score ? Number(score) as Score : null);
         }
         break;
       }
       case "error": {
         setStatus({ error: resp[2] });
+        setClaimedScore(null);
         break;
       }
       case "loading": {
         setStatus({ loading: true });
+        setClaimedScore(null);
         break;
       }
       case "processing": {
@@ -220,6 +229,7 @@ export const MyRating: Component<{
             ),
           },
         });
+        setClaimedScore(null);
         break;
       }
       default:
@@ -232,6 +242,7 @@ export const MyRating: Component<{
     } else {
       setStatus({ requiring_auth: true });
     }
+    setClaimedScore(null);
   }, { defer: true }));
 
   return (
@@ -255,6 +266,7 @@ export const MyRating: Component<{
         subjectId={props.subjectId}
         episodeId={props.episodeId}
         status={status()}
+        claimedScore={claimedScore()}
       />
     </Show>
   );
@@ -276,6 +288,7 @@ export const InnerMyRating: Component<{
   subjectId: SubjectId;
   episodeId: EpisodeId;
   status: Status;
+  claimedScore: Score | null;
 }> = (props) => {
   const [alarmScore, setAlarmScore] = createSignal<Score | null>(null);
 
@@ -379,9 +392,15 @@ export const InnerMyRating: Component<{
           />
         </Match>
         <Match when={props.status.requiring_auth}>
+          <Show when={props.claimedScore !== null}>
+            <Stars ratedScore={props.claimedScore} />
+          </Show>
           <PleaseDoAuth authStore={props.authStore} shorter />
         </Match>
         <Match when={props.status.requiring_fetch}>
+          <Show when={props.claimedScore !== null}>
+            <Stars ratedScore={props.claimedScore} />
+          </Show>
           <PleaseDoRefetch
             onRequestRefetch={props.refetchEpisodeData}
           />

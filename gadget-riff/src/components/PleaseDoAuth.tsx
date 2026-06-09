@@ -13,7 +13,7 @@ export const PleaseDoAuth: Component<{
         尚未取得用于身份认证的令牌。
         <br />
       </Show>
-      若要查看或提交自己的单集评分，
+      若要查看自己非公开评分或提交评分，
       <br />
       请<L _blank href={props.authStore.URL_AUTH_BANGUMI_PAGE}>
         授权此应用
