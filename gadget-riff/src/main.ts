@@ -75,6 +75,7 @@ async function main() {
       const subjectId = readonlyPageData.subjectId;
       if (subjectId) {
         processSubjectPage({
+          settingsStore,
           appClient,
           authStore,
           scoreStore,
@@ -89,6 +90,7 @@ async function main() {
       const subjectId = readonlyPageData.subjectId;
       if (subjectId) {
         processSubjectEpListPage({
+          settingsStore,
           appClient,
           authStore,
           scoreStore,

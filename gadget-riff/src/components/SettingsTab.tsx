@@ -281,7 +281,7 @@ const SectionAntiSpoilerForMusic: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <div class="title">音乐曲目评分防剧透</div>
+      <div class="title">音乐概览页面各曲目的整体评分</div>
       <RadioGroup
         currentValue={optAntiSpoilerForMusic()}
         options={props.settingsStore.getAntiSpoilerForMusicValues()}

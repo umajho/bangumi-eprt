@@ -3,11 +3,13 @@ import { createMyRatingInstance } from "../components/MyRating";
 import { createRateInfoInstance } from "../components/RateInfo";
 import type { EpisodeId, SubjectId } from "../definitions";
 import type { AuthStore } from "../stores/persistent-stores/auth-store";
+import type { SettingsStore } from "../stores/persistent-stores/settings-store";
 import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import { createClearDivElement } from "../utils/elements";
 
 export function processSubjectEpListPage(opts: {
+  settingsStore: SettingsStore;
   appClient: AppClient;
   authStore: AuthStore;
   scoreStore: ScoreStore;
@@ -70,6 +72,7 @@ export function processSubjectEpListPage(opts: {
     liEl.appendChild(myRatingInstance.element);
 
     const rateInfoInstance = createRateInfoInstance({
+      settingsStore: opts.settingsStore,
       appClient: opts.appClient,
       scoreStore: opts.scoreStore,
       revealedEpisodesStore: opts.revealedEpisodesStore,

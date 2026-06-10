@@ -3,6 +3,7 @@ import {
   type Component,
   createEffect,
   createMemo,
+  createSignal,
   Match,
   Show,
   Switch,
@@ -20,6 +21,7 @@ import { SmallStars } from "./SmallStars";
 import { ErrorMessageWithRetry } from "./errors";
 import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import * as epDataHelpers from "../utils/episode-data-helpers";
+import type { SettingsStore } from "../stores/persistent-stores/settings-store";
 
 const TAG_NAME = makeCustomElementTagName("rate-info");
 
@@ -28,6 +30,7 @@ type DisplayMode = "normal" | "inline_compact";
 export function createRateInfoInstance(opts: {
   displayMode?: DisplayMode;
 
+  settingsStore: SettingsStore;
   appClient: AppClient;
   scoreStore: ScoreStore;
   revealedEpisodesStore: RevealedEpisodesStore;
@@ -39,6 +42,7 @@ export function createRateInfoInstance(opts: {
   revealAllButton?: boolean;
 }) {
   registerRateInfo({
+    settingsStore: opts.settingsStore,
     appClient: opts.appClient,
     scoreStore: opts.scoreStore,
     revealedEpisodesStore: opts.revealedEpisodesStore,
@@ -65,6 +69,7 @@ export function createRateInfoInstance(opts: {
 let elementConstructor: CustomElementConstructor | null = null;
 
 function registerRateInfo(opts: {
+  settingsStore: SettingsStore;
   appClient: AppClient;
   scoreStore: ScoreStore;
   revealedEpisodesStore: RevealedEpisodesStore;
@@ -86,6 +91,7 @@ function registerRateInfo(opts: {
       >
         <RateInfo
           displayMode={props.displayMode ?? "normal"}
+          settingsStore={opts.settingsStore}
           appClient={opts.appClient}
           scoreStore={opts.scoreStore}
           revealedEpisodesStore={opts.revealedEpisodesStore}
@@ -103,6 +109,7 @@ function registerRateInfo(opts: {
 const RateInfo: Component<{
   displayMode: DisplayMode;
 
+  settingsStore: SettingsStore;
   appClient: AppClient;
   scoreStore: ScoreStore;
   revealedEpisodesStore: RevealedEpisodesStore;
@@ -125,6 +132,15 @@ const RateInfo: Component<{
   }
   function refetchEpisodeData() {
     queryEpisodeDataTracked({ shouldRefetch: true });
+  }
+
+  const [shouldHide, setShouldHide] = createSignal(false);
+  if (props.isMusic) {
+    const antiSpoilerOption = props.settingsStore
+      .getAntiSpoilerForMusicSignal();
+    createEffect(() => {
+      setShouldHide(antiSpoilerOption() === "not-showing-at-all");
+    });
   }
 
   const epDataResp = queryEpisodeDataTracked({ shouldRefetch: false });
@@ -150,14 +166,17 @@ const RateInfo: Component<{
       <Switch>
         <Match when={votesOk()}>
           {(votes) => (
-            <RateInfoInner
-              displayMode={props.displayMode}
-              revealAllButton={props.revealAllButton}
-              votes={votes()}
-              isRevealed={isRevealedSignal()}
-              reveal={() => props.revealedEpisodesStore.reveal(props.episodeId)}
-              revealAll={() => props.revealedEpisodesStore.revealAll()}
-            />
+            <Show when={!shouldHide()}>
+              <RateInfoInner
+                displayMode={props.displayMode}
+                revealAllButton={props.revealAllButton}
+                votes={votes()}
+                isRevealed={isRevealedSignal()}
+                reveal={() =>
+                  props.revealedEpisodesStore.reveal(props.episodeId)}
+                revealAll={() => props.revealedEpisodesStore.revealAll()}
+              />
+            </Show>
           )}
         </Match>
         <Match when={epDataResp()[0] === "loading"}>

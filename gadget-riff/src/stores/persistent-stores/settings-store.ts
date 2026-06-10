@@ -7,7 +7,10 @@ import { readonlyPageData } from "../readonly-page-data";
 export type SettingsStore = ReturnType<typeof createSettingsStore>;
 
 type SettingAntiSpoilerOption = "off" | "on-for-neither-watched-nor-rated";
-type SettingAntiSpoilerForMusicOption = "off" | "on-for-not-rated";
+type SettingAntiSpoilerForMusicOption =
+  | "off"
+  | "on-for-not-rated"
+  | "not-showing-at-all";
 type SettingTimelineTabButtonLocation = "more-dropdown" | "main-row";
 type SettingEpisodePageOverviewStyle = "boxed" | "compact";
 
@@ -88,14 +91,16 @@ export function createSettingsStore() {
     update("antiSpoilerForMusic", value);
   }
   function getAntiSpoilerForMusicValues(): SettingAntiSpoilerForMusicOption[] {
-    return ["off", "on-for-not-rated"];
+    return ["off", "on-for-not-rated", "not-showing-at-all"];
   }
   function getAntiSpoilerForMusicValueLabelText(
     value: SettingAntiSpoilerForMusicOption,
   ): string {
     return {
-      "off": "关闭",
-      "on-for-not-rated": "已有评分而自己尚未评分时，需主动揭开评分",
+      "off": "显示",
+      "on-for-not-rated":
+        "显示·防剧透（已有评分而自己尚未评分时，需主动揭开评分）",
+      "not-showing-at-all": "不显示",
     }[value];
   }
   function getAntiSpoilerForMusicSignal(): Accessor<

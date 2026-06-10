@@ -5,11 +5,13 @@ import {
   makeDataAttributeName,
   type SubjectId,
 } from "../definitions";
+import type { SettingsStore } from "../stores/persistent-stores/settings-store";
 import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 
 export function processCluetip(
-  { scoreStore, revealedEpisodesStore }: {
+  { settingsStore, scoreStore, revealedEpisodesStore }: {
+    settingsStore: SettingsStore;
     scoreStore: ScoreStore;
     revealedEpisodesStore: RevealedEpisodesStore;
   },
@@ -46,6 +48,7 @@ export function processCluetip(
     if (!firstBoardEl) return;
 
     const rateInfoInstance = createRateInfoInstance({
+      settingsStore,
       appClient: opts.appClient,
       scoreStore,
       revealedEpisodesStore,
