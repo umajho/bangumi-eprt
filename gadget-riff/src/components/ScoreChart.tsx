@@ -15,19 +15,17 @@ import {
   scoresReversed,
   type SubjectId,
 } from "../definitions";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import * as epDataHelpers from "../utils/episode-data-helpers";
 import { Tooltip } from "./Tooltip";
+import type { Context } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("score-chart");
 
-export function createScoreChartInstance(opts: {
-  scoreStore: ScoreStore;
-
+export function createScoreChartInstance(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
-  registerScoreChart({ scoreStore: opts.scoreStore });
+  registerScoreChart(ctx);
   const el = document.createElement(TAG_NAME);
   el.setAttribute("subject-id", String(opts.subjectId));
   el.setAttribute("episode-id", String(opts.episodeId));
@@ -37,7 +35,7 @@ export function createScoreChartInstance(opts: {
 
 let elementConstructor: CustomElementConstructor | null = null;
 
-function registerScoreChart(opts: { scoreStore: ScoreStore }) {
+function registerScoreChart(ctx: Context) {
   elementConstructor ??= customElement(TAG_NAME, {
     subjectId: null,
     episodeId: null,
@@ -50,7 +48,7 @@ function registerScoreChart(opts: { scoreStore: ScoreStore }) {
           Number.isInteger(props.episodeId)}
       >
         <ScoreChartWrapped
-          scoreStore={opts.scoreStore}
+          ctx={ctx}
           subjectId={props.subjectId!}
           episodeId={props.episodeId!}
         />
@@ -60,11 +58,11 @@ function registerScoreChart(opts: { scoreStore: ScoreStore }) {
 }
 
 const ScoreChartWrapped: Component<{
-  scoreStore: ScoreStore;
+  ctx: Context;
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }> = (props) => {
-  const dataResp = props.scoreStore.queryEpisodeDataTracked(
+  const dataResp = props.ctx.scoreStore.queryEpisodeDataTracked(
     props.subjectId,
     props.episodeId,
     { prefersFetchingCompleteSubjectVotes: false },

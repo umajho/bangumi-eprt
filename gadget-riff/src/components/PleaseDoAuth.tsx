@@ -1,10 +1,10 @@
 import { type Component, Show } from "solid-js";
 
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
 import { L } from "./utils";
+import type { PrimalContext } from "../context";
 
 export const PleaseDoAuth: Component<{
-  authStore: AuthStore;
+  ctx: PrimalContext;
   shorter?: boolean;
 }> = (props) => {
   return (
@@ -15,7 +15,7 @@ export const PleaseDoAuth: Component<{
       </Show>
       若要查看自己非公开评分或提交评分，
       <br />
-      请<L _blank href={props.authStore.URL_AUTH_BANGUMI_PAGE}>
+      请<L _blank href={props.ctx.authStore.URL_AUTH_BANGUMI_PAGE}>
         授权此应用
       </L>。（用于确认登录者）
     </div>

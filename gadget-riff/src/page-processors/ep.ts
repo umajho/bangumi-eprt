@@ -1,6 +1,5 @@
 import { type Accessor, createEffect, createRoot, on } from "solid-js";
 
-import type { AppClient } from "../clients/app-client";
 import { createEpisodeOverviewInstance } from "../components/EpisodeOverview";
 import {
   type EpisodeId,
@@ -10,26 +9,17 @@ import {
   type SubjectId,
   type UserId,
 } from "../definitions";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
 import { readonlyPageData } from "../stores/readonly-page-data";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import type {
   EpisodeDataResponse,
-  ScoreStore,
 } from "../stores/temporary-global-stores/score-store";
 import { createClearDivElement } from "../utils/elements";
 import { createSmallStarsInstance } from "../components/SmallStars";
 import { createMyRatingInCommentInstance } from "../components/MyRatingInComment";
 import { createMyRatingInstance } from "../components/MyRating";
+import type { Context } from "../context";
 
-export async function processEpPage(opts: {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-
+export async function processEpPage(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
@@ -38,15 +28,7 @@ export async function processEpPage(opts: {
   if (!columnEpAEl || !epDescEl) return;
 
   {
-    const episodeOverviewInstance = createEpisodeOverviewInstance({
-      settingsStore: opts.settingsStore,
-      appClient: opts.appClient,
-      authStore: opts.authStore,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
-      subjectId: opts.subjectId,
-      episodeId: opts.episodeId,
-    });
+    const episodeOverviewInstance = createEpisodeOverviewInstance(ctx, opts);
     columnEpAEl.prepend(episodeOverviewInstance.element);
 
     epDescEl.insertAdjacentElement("afterend", createClearDivElement());
@@ -55,7 +37,7 @@ export async function processEpPage(opts: {
   {
     const userIdToTextIdMap = buildUserIdToTextIdMap();
 
-    const dataResp = opts.scoreStore.queryEpisodeDataTracked(
+    const dataResp = ctx.scoreStore.queryEpisodeDataTracked(
       opts.subjectId,
       opts.episodeId,
       { prefersFetchingCompleteSubjectVotes: false },
@@ -67,20 +49,12 @@ export async function processEpPage(opts: {
       userIdToTextIdMap,
     });
 
-    processMyRatingsInComments({
-      appClient: opts.appClient,
-      authStore: opts.authStore,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
+    processMyRatingsInComments(ctx, {
       subjectId: opts.subjectId,
       episodeId: opts.episodeId,
     });
 
-    processReplysForm({
-      appClient: opts.appClient,
-      authStore: opts.authStore,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
+    processReplysForm(ctx, {
       subjectId: opts.subjectId,
       episodeId: opts.episodeId,
     });
@@ -133,11 +107,7 @@ function processOtherPeoplesRatingsInCommentsOnce(opts: {
 const DATA_ATTRIBUTE_NAME_RATING_IN_COMMENT_INSTALLED = //
   makeDataAttributeName("rating-in-comment-installed");
 
-function processMyRatingsInComments(opts: {
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+function processMyRatingsInComments(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
@@ -148,17 +118,13 @@ function processMyRatingsInComments(opts: {
     const oldInsertFn = chiiLib.ajax_reply.insertJsonComments;
     chiiLib.ajax_reply.insertJsonComments = function (...args: unknown[]) {
       oldInsertFn.apply(this, args);
-      installMyRatingsInComments(opts);
+      installMyRatingsInComments(ctx, opts);
     };
   }
 
-  installMyRatingsInComments(opts);
+  installMyRatingsInComments(ctx, opts);
 
-  function installMyRatingsInComments(opts: {
-    appClient: AppClient;
-    authStore: AuthStore;
-    scoreStore: ScoreStore;
-    revealedEpisodesStore: RevealedEpisodesStore;
+  function installMyRatingsInComments(ctx: Context, opts: {
     subjectId: SubjectId;
     episodeId: EpisodeId;
   }) {
@@ -173,7 +139,7 @@ function processMyRatingsInComments(opts: {
         .querySelector(".inner > .reply_content,.cmt_sub_content");
       if (!contentEl) continue;
 
-      const instance = createMyRatingInCommentInstance(opts);
+      const instance = createMyRatingInCommentInstance(ctx, opts);
       contentEl.insertAdjacentElement("beforebegin", instance.element);
       instance.element.insertAdjacentText("beforebegin", " ");
       instance.element.insertAdjacentText("afterend", " ");
@@ -184,11 +150,7 @@ function processMyRatingsInComments(opts: {
 /**
  * 处理子评论的表单。
  */
-function processReplysForm(opts: {
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+function processReplysForm(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
@@ -203,14 +165,10 @@ function processReplysForm(opts: {
     const submitButtonEl = el.querySelector("#submitBtnO");
     if (!submitButtonEl) return;
 
-    const instance = createMyRatingInstance({
+    const instance = createMyRatingInstance(ctx, {
       displayMode: "normal",
       shouldEnableVisibilityControl: true,
       prefersFetchingCompleteSubjectVotes: false,
-      appClient: opts.appClient,
-      authStore: opts.authStore,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
       subjectId: opts.subjectId,
       episodeId: opts.episodeId,
     });

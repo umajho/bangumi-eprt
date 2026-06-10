@@ -1,26 +1,12 @@
 import { createEffect, on } from "solid-js";
 
-import type { AppClient } from "../clients/app-client";
 import { createMyTimelineContentInstance } from "../components/MyTimelineContent";
 import type { EpisodeId, SubjectId } from "../definitions";
 import { processCluetip } from "../element-processors/cluetip";
 import { processPrgList } from "../element-processors/prg-list";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
-import type { BangumiClient } from "../clients/bangumi-client";
+import type { Context } from "../context";
 
-interface ProcessOptions {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  bgmClient: BangumiClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-}
-
-export function processRootPage(opts: ProcessOptions) {
+export function processRootPage(ctx: Context) {
   {
     for (const tinyHeaderEl of document.querySelectorAll(".tinyHeader")) {
       const textTipEl = tinyHeaderEl
@@ -41,7 +27,7 @@ export function processRootPage(opts: ProcessOptions) {
         return Number.isNaN(eps) ? null : eps;
       })();
 
-      opts.bgmClient.putEntryIntoSubjectCache(subjectId, {
+      ctx.bgmClient.putEntryIntoSubjectCache(subjectId, {
         name,
         ...(nameCn ? { nameCn } : {}),
         eps,
@@ -61,11 +47,11 @@ export function processRootPage(opts: ProcessOptions) {
       const name = m[2];
       if (isNaN(sort)) continue;
 
-      opts.bgmClient.putEntryIntoEpisodeCache(episodeID, { name, sort });
+      ctx.bgmClient.putEntryIntoEpisodeCache(episodeID, { name, sort });
     }
   }
 
-  const { initializeCluetip } = processCluetip(opts);
+  const { initializeCluetip } = processCluetip(ctx);
 
   for (const prgListEl of document.querySelectorAll("ul.prg_list")) {
     const subjectId = (() => {
@@ -77,20 +63,17 @@ export function processRootPage(opts: ProcessOptions) {
     })();
     if (subjectId === undefined || Number.isNaN(subjectId)) continue;
 
-    processPrgList({
-      appClient: opts.appClient,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
+    processPrgList(ctx, {
       initializeCluetip,
       prgListElement: prgListEl as HTMLUListElement,
       subjectId,
     });
   }
 
-  processTimelineColumn(opts);
+  processTimelineColumn(ctx);
 }
 
-function processTimelineColumn(opts: ProcessOptions) {
+function processTimelineColumn(ctx: Context) {
   const topUl = document.querySelector("ul#timelineTabs > li:has(a.top) > ul");
   const topLi = topUl?.closest("li");
   if (!topUl || !topLi) return;
@@ -109,11 +92,7 @@ function processTimelineColumn(opts: ProcessOptions) {
 
     containerEl.innerHTML = "";
 
-    const myTimelineContentInstance = createMyTimelineContentInstance({
-      appClient: opts.appClient,
-      bgmClient: opts.bgmClient,
-      authStore: opts.authStore,
-    });
+    const myTimelineContentInstance = createMyTimelineContentInstance(ctx);
     containerEl.appendChild(myTimelineContentInstance.element);
   }
 
@@ -126,7 +105,7 @@ function processTimelineColumn(opts: ProcessOptions) {
   }
 
   createEffect(
-    on(opts.settingsStore.getTimelineTabButtonLocationSignal(), (s) => {
+    on(ctx.settingsStore.getTimelineTabButtonLocationSignal(), (s) => {
       const hadFocus = hasFocus();
       currentTabButtonLiEl?.remove();
       switch (s) {

@@ -9,33 +9,20 @@ import {
   type Score,
   type SubjectId,
 } from "../definitions";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import * as epDataHelpers from "../utils/episode-data-helpers";
 import { readonlyPageData } from "../stores/readonly-page-data";
 import { SmallStars } from "./SmallStars";
 import { MyRating } from "./MyRating";
-import type { AppClient } from "../clients/app-client";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import { render } from "solid-js/web";
+import type { Context } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("my-rating-in-comment");
 
-export function createMyRatingInCommentInstance(opts: {
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-
-  subjectId: SubjectId;
-  episodeId: EpisodeId;
-}) {
-  registerMyRatingInComment({
-    appClient: opts.appClient,
-    authStore: opts.authStore,
-    scoreStore: opts.scoreStore,
-    revealedEpisodesStore: opts.revealedEpisodesStore,
-  });
+export function createMyRatingInCommentInstance(
+  ctx: Context,
+  opts: { subjectId: SubjectId; episodeId: EpisodeId },
+) {
+  registerMyRatingInComment(ctx);
   const el = document.createElement(TAG_NAME);
   el.setAttribute("subject-id", String(opts.subjectId));
   el.setAttribute("episode-id", String(opts.episodeId));
@@ -47,12 +34,7 @@ let elementConstructor: CustomElementConstructor | null = null;
 
 const RATE_DIALOG_ID = makeHtmlId("rate-dialog");
 
-function registerMyRatingInComment(opts: {
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-}) {
+function registerMyRatingInComment(ctx: Context) {
   elementConstructor ??= customElement(TAG_NAME, {
     subjectId: null,
     episodeId: null,
@@ -73,10 +55,7 @@ function registerMyRatingInComment(opts: {
               noFloat
               shouldEnableVisibilityControl
               prefersFetchingCompleteSubjectVotes={false}
-              appClient={opts.appClient}
-              authStore={opts.authStore}
-              scoreStore={opts.scoreStore}
-              revealedEpisodesStore={opts.revealedEpisodesStore}
+              ctx={ctx}
               subjectId={props.subjectId!}
               episodeId={props.episodeId!}
               isPrimary
@@ -94,7 +73,7 @@ function registerMyRatingInComment(opts: {
           Number.isInteger(props.episodeId)}
       >
         <MyRatingInCommentWrapped
-          scoreStore={opts.scoreStore}
+          ctx={ctx}
           subjectId={props.subjectId!}
           episodeId={props.episodeId!}
         />
@@ -104,11 +83,11 @@ function registerMyRatingInComment(opts: {
 }
 
 const MyRatingInCommentWrapped: Component<{
-  scoreStore: ScoreStore;
+  ctx: Context;
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }> = (props) => {
-  const dataResp = props.scoreStore.queryEpisodeDataTracked(
+  const dataResp = props.ctx.scoreStore.queryEpisodeDataTracked(
     props.subjectId,
     props.episodeId,
     { prefersFetchingCompleteSubjectVotes: false },

@@ -11,7 +11,6 @@ import {
 } from "solid-js";
 import { customElement, noShadowDOM } from "solid-element";
 
-import type { AppClient } from "../clients/app-client";
 import {
   describeScore,
   type EpisodeId,
@@ -20,43 +19,32 @@ import {
   scores,
   type SubjectId,
 } from "../definitions";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
 import { PleaseDoAuth, PleaseDoRefetch } from "./PleaseDoAuth";
 import { cls } from "../utils/cls";
 import { ErrorMessageWithRetry } from "./errors";
 import { Tooltip } from "./Tooltip";
 import { readonlyPageData } from "../stores/readonly-page-data";
+import type { Context } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("my-rating");
 
 type DisplayMode = "normal" | "inline_compact";
 
-export function createMyRatingInstance(opts: {
+export function createMyRatingInstance(ctx: Context, opts: {
   displayMode?: DisplayMode;
   noFloat?: boolean;
 
   shouldEnableVisibilityControl?: boolean;
   prefersFetchingCompleteSubjectVotes: boolean;
 
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-
   subjectId: SubjectId;
   episodeId: EpisodeId;
   isPrimary?: boolean;
 }) {
-  registerMyRating({
+  registerMyRating(ctx, {
     shouldEnableVisibilityControl: opts.shouldEnableVisibilityControl ?? false,
     prefersFetchingCompleteSubjectVotes:
       opts.prefersFetchingCompleteSubjectVotes,
-    appClient: opts.appClient,
-    authStore: opts.authStore,
-    scoreStore: opts.scoreStore,
-    revealedEpisodesStore: opts.revealedEpisodesStore,
   });
   const el = document.createElement(TAG_NAME);
   if (opts.displayMode) {
@@ -76,13 +64,9 @@ export function createMyRatingInstance(opts: {
 
 let elementConstructor: CustomElementConstructor | null = null;
 
-function registerMyRating(opts: {
+function registerMyRating(ctx: Context, opts: {
   shouldEnableVisibilityControl: boolean;
   prefersFetchingCompleteSubjectVotes: boolean;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
 }) {
   elementConstructor ??= customElement(TAG_NAME, {
     displayMode: null,
@@ -104,10 +88,7 @@ function registerMyRating(opts: {
           shouldEnableVisibilityControl={opts.shouldEnableVisibilityControl}
           prefersFetchingCompleteSubjectVotes={opts
             .prefersFetchingCompleteSubjectVotes}
-          appClient={opts.appClient}
-          authStore={opts.authStore}
-          scoreStore={opts.scoreStore}
-          revealedEpisodesStore={opts.revealedEpisodesStore}
+          ctx={ctx}
           subjectId={props.subjectId!}
           episodeId={props.episodeId!}
           isPrimary={!!props.isPrimary}
@@ -150,17 +131,14 @@ export const MyRating: Component<{
   shouldEnableVisibilityControl?: boolean;
   prefersFetchingCompleteSubjectVotes: boolean;
 
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+  ctx: Context;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
   isPrimary: boolean;
 }> = (props) => {
   const [status, setStatus] = createSignal(((): Status => {
-    if (props.authStore.statusUnion().withSessionToken) {
+    if (props.ctx.authStore.statusUnion().withSessionToken) {
       return { loading: true };
     } else {
       return { requiring_auth: true };
@@ -169,7 +147,7 @@ export const MyRating: Component<{
   const [claimedScore, setClaimedScore] = createSignal<Score | null>(null);
 
   function queryEpisodeDataTracked(opts: { shouldRefetch: boolean }) {
-    return props.scoreStore.queryEpisodeDataTracked(
+    return props.ctx.scoreStore.queryEpisodeDataTracked(
       props.subjectId,
       props.episodeId,
       {
@@ -198,7 +176,7 @@ export const MyRating: Component<{
           });
         } else {
           setStatus(
-            props.authStore.statusUnion().withSessionToken
+            props.ctx.authStore.statusUnion().withSessionToken
               ? { requiring_fetch: true }
               : { requiring_auth: true },
           );
@@ -236,7 +214,7 @@ export const MyRating: Component<{
         resp satisfies never;
     }
   });
-  createEffect(on([props.authStore.statusUnion], ([statusUnion]) => {
+  createEffect(on([props.ctx.authStore.statusUnion], ([statusUnion]) => {
     if (statusUnion.withSessionToken) {
       setStatus({ requiring_fetch: true });
     } else {
@@ -259,10 +237,7 @@ export const MyRating: Component<{
         shouldEnableVisibilityControl={props.shouldEnableVisibilityControl ??
           false}
         refetchEpisodeData={refetchEpisodeData}
-        appClient={props.appClient}
-        authStore={props.authStore}
-        scoreStore={props.scoreStore}
-        revealedEpisodesStore={props.revealedEpisodesStore}
+        ctx={props.ctx}
         subjectId={props.subjectId}
         episodeId={props.episodeId}
         status={status()}
@@ -280,10 +255,7 @@ export const InnerMyRating: Component<{
 
   refetchEpisodeData: () => void;
 
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+  ctx: Context;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
@@ -304,7 +276,7 @@ export const InnerMyRating: Component<{
   });
 
   function updateMyScore(score: Score | null) {
-    props.scoreStore.updateMyRating(
+    props.ctx.scoreStore.updateMyRating(
       props.subjectId,
       props.episodeId,
       { score },
@@ -312,7 +284,7 @@ export const InnerMyRating: Component<{
   }
 
   function updateMyVisibility(isVisible: boolean) {
-    props.scoreStore.updateMyRating(
+    props.ctx.scoreStore.updateMyRating(
       props.subjectId,
       props.episodeId,
       { visibility: { isVisible } },
@@ -395,7 +367,7 @@ export const InnerMyRating: Component<{
           <Show when={props.claimedScore !== null}>
             <Stars ratedScore={props.claimedScore} />
           </Show>
-          <PleaseDoAuth authStore={props.authStore} shorter />
+          <PleaseDoAuth ctx={props.ctx} shorter />
         </Match>
         <Match when={props.status.requiring_fetch}>
           <Show when={props.claimedScore !== null}>

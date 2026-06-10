@@ -13,14 +13,12 @@ import { customElement, noShadowDOM } from "solid-element";
 import { makeCustomElementTagName } from "../definitions";
 import type {
   SettingsStatus,
-  SettingsStore,
 } from "../stores/persistent-stores/settings-store";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
 import { PleaseDoAuth } from "./PleaseDoAuth";
 import { ErrorMessage } from "./errors";
-import type { AppClient } from "../clients/app-client";
 import { L } from "./utils";
 import { readonlyPageData } from "../stores/readonly-page-data";
+import type { PrimalContext } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("settings-tab");
 const TAG_NAME_SECTION_AUTH_IN_THE_WILD = //
@@ -29,30 +27,20 @@ const TAG_NAME_SECTION_AUTH_IN_THE_WILD = //
 let elementConstructor: CustomElementConstructor | null = null;
 let elementConstructorSectionAuth: CustomElementConstructor | null = null;
 
-export function registerSettingsTab(opts: {
-  settingsStore: SettingsStore;
-  authStore: AuthStore;
-  appClient: AppClient;
-}): { tagName: typeof TAG_NAME } {
+export function registerSettingsTab(
+  ctx: PrimalContext,
+): { tagName: typeof TAG_NAME } {
   elementConstructor ??= customElement(TAG_NAME, {}, () => {
     noShadowDOM();
 
-    return (
-      <SettingsTab
-        settingsStore={opts.settingsStore}
-        authStore={opts.authStore}
-        appClient={opts.appClient}
-      />
-    );
+    return <SettingsTab ctx={ctx} />;
   });
 
   return { tagName: TAG_NAME };
 }
 
-const SettingsTab: Component<
-  { settingsStore: SettingsStore; authStore: AuthStore; appClient: AppClient }
-> = (props) => {
-  const status = props.settingsStore.getStatusSignal();
+const SettingsTab: Component<{ ctx: PrimalContext }> = (props) => {
+  const status = props.ctx.settingsStore.getStatusSignal();
 
   return (
     <div
@@ -73,68 +61,49 @@ const SettingsTab: Component<
       <div style={{ "text-align": "center" }}>
         <L _blank href={readonlyPageData.gadgetPagePath}>组件页</L>
       </div>
-      <SectionAuth authStore={props.authStore} />
-      <SectionExportData
-        authStore={props.authStore}
-        appClient={props.appClient}
-      />
-      <SectionAntiSpoiler
-        settingsStore={props.settingsStore}
-        status={status()}
-      />
-      <SectionAntiSpoilerForMusic
-        settingsStore={props.settingsStore}
-        status={status()}
-      />
-      <SectionTimelineTabButtonLocation
-        settingsStore={props.settingsStore}
-        status={status()}
-      />
-      <SectionEpisodePageOverviewStyle
-        settingsStore={props.settingsStore}
-        status={status()}
-      />
+      <SectionAuth ctx={props.ctx} />
+      <SectionExportData ctx={props.ctx} />
+      <SectionAntiSpoiler ctx={props.ctx} status={status()} />
+      <SectionAntiSpoilerForMusic ctx={props.ctx} status={status()} />
+      <SectionTimelineTabButtonLocation ctx={props.ctx} status={status()} />
+      <SectionEpisodePageOverviewStyle ctx={props.ctx} status={status()} />
     </div>
   );
 };
 
-export function createSettingsTabSectionAuthInTheWildInstance(opts: {
-  authStore: AuthStore;
-}) {
-  const r = registerSettingsTabSectionAuthInTheWild(opts);
+export function createSettingsTabSectionAuthInTheWildInstance(
+  ctx: PrimalContext,
+) {
+  const r = registerSettingsTabSectionAuthInTheWild(ctx);
   const el = document.createElement(r.tagName);
   return { element: el };
 }
 
-function registerSettingsTabSectionAuthInTheWild(opts: {
-  authStore: AuthStore;
-}): { tagName: typeof TAG_NAME_SECTION_AUTH_IN_THE_WILD } {
+function registerSettingsTabSectionAuthInTheWild(
+  ctx: PrimalContext,
+): { tagName: typeof TAG_NAME_SECTION_AUTH_IN_THE_WILD } {
   elementConstructorSectionAuth ??= customElement(
     TAG_NAME_SECTION_AUTH_IN_THE_WILD,
     {},
     () => {
       noShadowDOM();
 
-      return <SectionAuthInTheWild authStore={opts.authStore} />;
+      return <SectionAuthInTheWild ctx={ctx} />;
     },
   );
 
   return { tagName: TAG_NAME_SECTION_AUTH_IN_THE_WILD };
 }
 
-const SectionAuthInTheWild: Component<{
-  authStore: AuthStore;
-}> = (props) => {
+const SectionAuthInTheWild: Component<{ ctx: PrimalContext }> = (props) => {
   return (
     <div style={{ "border-style": "dotted" }}>
-      <SectionAuth authStore={props.authStore} />
+      <SectionAuth ctx={props.ctx} />
     </div>
   );
 };
 
-const SectionAuth: Component<{
-  authStore: AuthStore;
-}> = (props) => {
+const SectionAuth: Component<{ ctx: PrimalContext }> = (props) => {
   return (
     <DisableableSection disabled={false}>
       <div class="title">身份认证（用于单集评分服务器）</div>
@@ -143,19 +112,21 @@ const SectionAuth: Component<{
         <div style={{ display: "flex", "flex-direction": "column" }}>
           <div>
             <Switch>
-              <Match when={props.authStore.statusUnion().noSessionToken}>
-                <PleaseDoAuth authStore={props.authStore} />
+              <Match when={props.ctx.authStore.statusUnion().noSessionToken}>
+                <PleaseDoAuth ctx={props.ctx} />
               </Match>
-              <Match when={props.authStore.statusUnion().withSessionToken}>
+              <Match when={props.ctx.authStore.statusUnion().withSessionToken}>
                 <span style={{ color: "green" }}>已取得身份认证令牌。</span>
                 {/* TODO: 允许 deactivate 该令牌。 */}
               </Match>
-              <Match when={props.authStore.statusUnion().redeemingSessionToken}>
+              <Match
+                when={props.ctx.authStore.statusUnion().redeemingSessionToken}
+              >
                 <span style={{ color: "orange" }}>正在兑换身份认证令牌…</span>
               </Match>
             </Switch>
           </div>
-          <Show when={props.authStore.tabClosureCountdownSeconds()}>
+          <Show when={props.ctx.authStore.tabClosureCountdownSeconds()}>
             {(countdown) => (
               <div>
                 此标签页将于 <span style={{ color: "red" }}>{countdown()}</span>
@@ -163,7 +134,7 @@ const SectionAuth: Component<{
                 秒后自动关闭。
                 <br />
                 <button
-                  onClick={() => props.authStore.stopTabClosureCountdown()}
+                  onClick={() => props.ctx.authStore.stopTabClosureCountdown()}
                 >
                   不要自动关闭！
                 </button>
@@ -176,10 +147,7 @@ const SectionAuth: Component<{
   );
 };
 
-const SectionExportData: Component<{
-  authStore: AuthStore;
-  appClient: AppClient;
-}> = (props) => {
+const SectionExportData: Component<{ ctx: PrimalContext }> = (props) => {
   type State = ["normal"] | ["processing"] | ["error", string];
   type StateUnion = {
     normal?: true;
@@ -187,7 +155,8 @@ const SectionExportData: Component<{
     error?: { message: string };
   };
 
-  const hasSessionToken = () => props.authStore.statusUnion().withSessionToken;
+  const hasSessionToken = () =>
+    props.ctx.authStore.statusUnion().withSessionToken;
 
   const [state, setState] = createSignal<State>(["normal"]);
   const stateUnion = createMemo((): StateUnion => {
@@ -208,7 +177,7 @@ const SectionExportData: Component<{
   async function exportData() {
     setState(["processing"]);
 
-    const resp = await props.appClient.downloadMyEpisodeRatingsData();
+    const resp = await props.ctx.appClient.downloadMyEpisodeRatingsData();
     switch (resp[0]) {
       case "ok": {
         setState(["normal"]);
@@ -219,7 +188,7 @@ const SectionExportData: Component<{
         break;
       }
       case "auth_required": {
-        props.authStore.clear();
+        props.ctx.authStore.clear();
         setState(["normal"]);
         break;
       }
@@ -253,30 +222,30 @@ const SectionExportData: Component<{
 };
 
 const SectionAntiSpoiler: Component<{
-  settingsStore: SettingsStore;
+  ctx: PrimalContext;
   status: SettingsStatus;
 }> = (props) => {
-  const optAntiSpoiler = props.settingsStore.getAntiSpoilerSignal();
+  const optAntiSpoiler = props.ctx.settingsStore.getAntiSpoilerSignal();
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
       <div class="title">章节评分防剧透</div>
       <RadioGroup
         currentValue={optAntiSpoiler()}
-        options={props.settingsStore.getAntiSpoilerValues()}
+        options={props.ctx.settingsStore.getAntiSpoilerValues()}
         getLabel={(value) =>
-          props.settingsStore.getAntiSpoilerValueLabelText(value)}
-        setValue={(v) => props.settingsStore.updateAntiSpoiler(v)}
+          props.ctx.settingsStore.getAntiSpoilerValueLabelText(value)}
+        setValue={(v) => props.ctx.settingsStore.updateAntiSpoiler(v)}
       />
     </DisableableSection>
   );
 };
 
 const SectionAntiSpoilerForMusic: Component<{
-  settingsStore: SettingsStore;
+  ctx: PrimalContext;
   status: SettingsStatus;
 }> = (props) => {
-  const optAntiSpoilerForMusic = props.settingsStore
+  const optAntiSpoilerForMusic = props.ctx.settingsStore
     .getAntiSpoilerForMusicSignal();
 
   return (
@@ -284,20 +253,20 @@ const SectionAntiSpoilerForMusic: Component<{
       <div class="title">音乐概览页面各曲目的整体评分</div>
       <RadioGroup
         currentValue={optAntiSpoilerForMusic()}
-        options={props.settingsStore.getAntiSpoilerForMusicValues()}
+        options={props.ctx.settingsStore.getAntiSpoilerForMusicValues()}
         getLabel={(value) =>
-          props.settingsStore.getAntiSpoilerForMusicValueLabelText(value)}
-        setValue={(v) => props.settingsStore.updateAntiSpoilerForMusic(v)}
+          props.ctx.settingsStore.getAntiSpoilerForMusicValueLabelText(value)}
+        setValue={(v) => props.ctx.settingsStore.updateAntiSpoilerForMusic(v)}
       />
     </DisableableSection>
   );
 };
 
 const SectionTimelineTabButtonLocation: Component<{
-  settingsStore: SettingsStore;
+  ctx: PrimalContext;
   status: SettingsStatus;
 }> = (props) => {
-  const optTimelineTabButtonLocation = props.settingsStore
+  const optTimelineTabButtonLocation = props.ctx.settingsStore
     .getTimelineTabButtonLocationSignal();
 
   return (
@@ -305,22 +274,23 @@ const SectionTimelineTabButtonLocation: Component<{
       <div class="title">时间线标签页按钮位置</div>
       <RadioGroup
         currentValue={optTimelineTabButtonLocation()}
-        options={props.settingsStore.getTimelineTabButtonLocationValues()}
+        options={props.ctx.settingsStore.getTimelineTabButtonLocationValues()}
         getLabel={(value) =>
-          props.settingsStore.getTimelineTabButtonLocationValueLabelText(
+          props.ctx.settingsStore.getTimelineTabButtonLocationValueLabelText(
             value,
           )}
-        setValue={(v) => props.settingsStore.updateTimelineTabButtonLocation(v)}
+        setValue={(v) =>
+          props.ctx.settingsStore.updateTimelineTabButtonLocation(v)}
       />
     </DisableableSection>
   );
 };
 
 const SectionEpisodePageOverviewStyle: Component<{
-  settingsStore: SettingsStore;
+  ctx: PrimalContext;
   status: SettingsStatus;
 }> = (props) => {
-  const optEpisodePageOverviewStyle = props.settingsStore
+  const optEpisodePageOverviewStyle = props.ctx.settingsStore
     .getEpisodePageOverviewStyleSignal();
 
   return (
@@ -328,12 +298,13 @@ const SectionEpisodePageOverviewStyle: Component<{
       <div class="title">章节页面概览显示风格</div>
       <RadioGroup
         currentValue={optEpisodePageOverviewStyle()}
-        options={props.settingsStore.getEpisodePageOverviewStyleValues()}
+        options={props.ctx.settingsStore.getEpisodePageOverviewStyleValues()}
         getLabel={(value) =>
-          props.settingsStore.getEpisodePageOverviewStyleValueLabelText(
+          props.ctx.settingsStore.getEpisodePageOverviewStyleValueLabelText(
             value,
           )}
-        setValue={(v) => props.settingsStore.updateEpisodePageOverviewStyle(v)}
+        setValue={(v) =>
+          props.ctx.settingsStore.updateEpisodePageOverviewStyle(v)}
       />
     </DisableableSection>
   );

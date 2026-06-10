@@ -1,27 +1,16 @@
-import type { AppClient } from "../clients/app-client";
 import { createRateInfoInstance } from "../components/RateInfo";
+import type { Context } from "../context";
 import {
   type EpisodeId,
   makeDataAttributeName,
   type SubjectId,
 } from "../definitions";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 
-export function processCluetip(
-  { settingsStore, scoreStore, revealedEpisodesStore }: {
-    settingsStore: SettingsStore;
-    scoreStore: ScoreStore;
-    revealedEpisodesStore: RevealedEpisodesStore;
-  },
-) {
+export function processCluetip(ctx: Context) {
   let counter = 0;
 
   async function initializeCluetip(
     opts: {
-      appClient: AppClient;
-
       subjectId: SubjectId;
       episodeId: EpisodeId;
     },
@@ -38,7 +27,7 @@ export function processCluetip(
     counter++;
     const currentCounter = counter;
 
-    if (!scoreStore.hasTouchedCompleteSubjectVotes(opts.subjectId)) {
+    if (!ctx.scoreStore.hasTouchedCompleteSubjectVotes(opts.subjectId)) {
       // 确保用户不是只是无意划过。
       await new Promise((resolve) => setTimeout(resolve, 250));
       if (currentCounter !== counter || !$(popupEl).is(":visible")) return;
@@ -47,11 +36,7 @@ export function processCluetip(
     const firstBoardEl = popupEl.querySelector(".tip .board");
     if (!firstBoardEl) return;
 
-    const rateInfoInstance = createRateInfoInstance({
-      settingsStore,
-      appClient: opts.appClient,
-      scoreStore,
-      revealedEpisodesStore,
+    const rateInfoInstance = createRateInfoInstance(ctx, {
       subjectId: opts.subjectId,
       episodeId: opts.episodeId,
       isPrimary: true,
@@ -64,7 +49,7 @@ export function processCluetip(
     ) {
       if (epStatusEl.id.startsWith("Watched")) {
         epStatusEl.addEventListener("click", () => {
-          revealedEpisodesStore.reveal(opts.episodeId);
+          ctx.revealedEpisodesStore.reveal(opts.episodeId);
         });
       }
     }

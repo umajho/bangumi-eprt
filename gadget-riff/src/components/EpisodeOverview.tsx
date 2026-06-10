@@ -7,37 +7,21 @@ import {
   makeCustomElementTagName,
   type SubjectId,
 } from "../definitions";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import * as epDataHelpers from "../utils/episode-data-helpers";
 import { cls } from "../utils/cls";
 import { Scoreboard } from "./Scoreboard";
 import { ScoreChart } from "./ScoreChart";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
 import { MyRating } from "./MyRating";
-import type { AppClient } from "../clients/app-client";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import { ErrorMessageWithRetry } from "./errors";
+import type { Context } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("episode-overview");
 
-export function createEpisodeOverviewInstance(opts: {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-
+export function createEpisodeOverviewInstance(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
-  registerEpisodeOverview({
-    settingsStore: opts.settingsStore,
-    appClient: opts.appClient,
-    authStore: opts.authStore,
-    scoreStore: opts.scoreStore,
-    revealedEpisodesStore: opts.revealedEpisodesStore,
-  });
+  registerEpisodeOverview(ctx);
   const el = document.createElement(TAG_NAME);
   el.setAttribute("subject-id", String(opts.subjectId));
   el.setAttribute("episode-id", String(opts.episodeId));
@@ -47,13 +31,7 @@ export function createEpisodeOverviewInstance(opts: {
 
 let elementConstructor: CustomElementConstructor | null = null;
 
-function registerEpisodeOverview(opts: {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-}) {
+function registerEpisodeOverview(ctx: Context) {
   elementConstructor ??= customElement(TAG_NAME, {
     subjectId: null,
     episodeId: null,
@@ -66,11 +44,7 @@ function registerEpisodeOverview(opts: {
           Number.isInteger(props.episodeId)}
       >
         <EpisodeOverviewWrapped
-          settingsStore={opts.settingsStore}
-          appClient={opts.appClient}
-          authStore={opts.authStore}
-          scoreStore={opts.scoreStore}
-          revealedEpisodesStore={opts.revealedEpisodesStore}
+          ctx={ctx}
           subjectId={props.subjectId!}
           episodeId={props.episodeId!}
         />
@@ -80,17 +54,13 @@ function registerEpisodeOverview(opts: {
 }
 
 const EpisodeOverviewWrapped: Component<{
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+  ctx: Context;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }> = (props) => {
   function queryEpisodeDataTracked(opts: { shouldRefetch: boolean }) {
-    return props.scoreStore.queryEpisodeDataTracked(
+    return props.ctx.scoreStore.queryEpisodeDataTracked(
       props.subjectId,
       props.episodeId,
       {
@@ -126,11 +96,7 @@ const EpisodeOverviewWrapped: Component<{
         <Match when={data()}>
           {(data) => (
             <EpisodeOverview
-              settingsStore={props.settingsStore}
-              appClient={props.appClient}
-              authStore={props.authStore}
-              scoreStore={props.scoreStore}
-              revealedEpisodesStore={props.revealedEpisodesStore}
+              ctx={props.ctx}
               subjectId={props.subjectId}
               episodeId={props.episodeId}
               data={data()}
@@ -143,18 +109,15 @@ const EpisodeOverviewWrapped: Component<{
 };
 
 const EpisodeOverview: Component<{
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+  ctx: Context;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
 
   data: EpisodeData;
 }> = (props) => {
-  const styleSetting = props.settingsStore.getEpisodePageOverviewStyleSignal();
+  const styleSetting = props.ctx.settingsStore
+    .getEpisodePageOverviewStyleSignal();
 
   return (
     <Switch>
@@ -163,10 +126,7 @@ const EpisodeOverview: Component<{
           <div class="SidePanel png_bg">
             <h2>单集评分</h2>
             <EpisodeOverviewInner
-              appClient={props.appClient}
-              authStore={props.authStore}
-              scoreStore={props.scoreStore}
-              revealedEpisodesStore={props.revealedEpisodesStore}
+              ctx={props.ctx}
               subjectId={props.subjectId}
               episodeId={props.episodeId}
               data={props.data}
@@ -176,10 +136,7 @@ const EpisodeOverview: Component<{
       </Match>
       <Match when={styleSetting() === "compact"}>
         <EpisodeOverviewInner
-          appClient={props.appClient}
-          authStore={props.authStore}
-          scoreStore={props.scoreStore}
-          revealedEpisodesStore={props.revealedEpisodesStore}
+          ctx={props.ctx}
           subjectId={props.subjectId}
           episodeId={props.episodeId}
           data={props.data}
@@ -190,10 +147,7 @@ const EpisodeOverview: Component<{
 };
 
 const EpisodeOverviewInner: Component<{
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+  ctx: Context;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
@@ -209,10 +163,7 @@ const EpisodeOverviewInner: Component<{
         noFloat={true}
         shouldEnableVisibilityControl={true}
         prefersFetchingCompleteSubjectVotes={false}
-        appClient={props.appClient}
-        authStore={props.authStore}
-        scoreStore={props.scoreStore}
-        revealedEpisodesStore={props.revealedEpisodesStore}
+        ctx={props.ctx}
         subjectId={props.subjectId}
         episodeId={props.episodeId}
         isPrimary={true}

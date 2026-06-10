@@ -20,11 +20,9 @@ import {
   type Score,
   type SubjectId,
 } from "../definitions";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
 import { PleaseDoAuth, PleaseDoRefetch } from "./PleaseDoAuth";
 import type { GetUserTimeLineItemsResponseData } from "../shared/dto";
 import { ErrorMessageWithRetry } from "./errors";
-import type { AppClient } from "../clients/app-client";
 import { readonlyPageData } from "../stores/readonly-page-data";
 import { SmallStars } from "./SmallStars";
 import { L } from "./utils";
@@ -32,53 +30,31 @@ import {
   formatDatesDifferences,
   formatDateToTime,
 } from "../utils/date-formatting";
-import type {
-  BangumiClient,
-  SubjectCacheEntry,
-} from "../clients/bangumi-client";
+import type { SubjectCacheEntry } from "../clients/bangumi-client";
 import { Tooltip } from "./Tooltip";
 import { EprtLinkSmallGrey } from "./EprtLink";
+import type { Context } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("my-timeline-content");
 
-export function createMyTimelineContentInstance(
-  opts: {
-    appClient: AppClient;
-    bgmClient: BangumiClient;
-    authStore: AuthStore;
-  },
-) {
-  registerMyTimelineContent(opts);
+export function createMyTimelineContentInstance(ctx: Context) {
+  registerMyTimelineContent(ctx);
   const el = document.createElement(TAG_NAME);
   return { element: el };
 }
 
 let elementConstructor: CustomElementConstructor | null = null;
 
-function registerMyTimelineContent(
-  opts: {
-    appClient: AppClient;
-    bgmClient: BangumiClient;
-    authStore: AuthStore;
-  },
-) {
+function registerMyTimelineContent(ctx: Context) {
   elementConstructor ??= customElement(TAG_NAME, {}, () => {
     noShadowDOM();
 
-    return (
-      <MyTimelineContent
-        appClient={opts.appClient}
-        bgmClient={opts.bgmClient}
-        authStore={opts.authStore}
-      />
-    );
+    return <MyTimelineContent ctx={ctx} />;
   });
 }
 
 const MyTimelineContent: Component<{
-  appClient: AppClient;
-  bgmClient: BangumiClient;
-  authStore: AuthStore;
+  ctx: Context;
 }> = (props) => {
   type State =
     | ["idle"]
@@ -109,7 +85,7 @@ const MyTimelineContent: Component<{
   const [currentPageNumber, setCurrentPageNumber] = createSignal(1);
 
   createEffect(on(currentPageNumber, (currentPageNumber) => {
-    if (props.authStore.statusUnion().withSessionToken) {
+    if (props.ctx.authStore.statusUnion().withSessionToken) {
       loadPage(currentPageNumber);
     }
   }));
@@ -117,13 +93,13 @@ const MyTimelineContent: Component<{
   async function loadPage(pageNumber: number) {
     setState(["loading"]);
 
-    const resp = await props.appClient.getMyTimelineItems({ pageNumber });
+    const resp = await props.ctx.appClient.getMyTimelineItems({ pageNumber });
 
     switch (resp[0]) {
       case "ok": {
         setState(["loaded", resp[1], {
-          isFilled:
-            resp[1].items.length === props.appClient.TIMELINE_ITEMS_PER_PAGE,
+          isFilled: resp[1].items.length ===
+            props.ctx.appClient.TIMELINE_ITEMS_PER_PAGE,
         }]);
         break;
       }
@@ -132,7 +108,7 @@ const MyTimelineContent: Component<{
         break;
       }
       case "auth_required": {
-        props.authStore.clear();
+        props.ctx.authStore.clear();
         setState(["idle"]);
         break;
       }
@@ -172,8 +148,8 @@ const MyTimelineContent: Component<{
         打开设置
       </button>
       <Show
-        when={props.authStore.statusUnion().withSessionToken}
-        fallback={<PleaseDoAuth authStore={props.authStore} />}
+        when={props.ctx.authStore.statusUnion().withSessionToken}
+        fallback={<PleaseDoAuth ctx={props.ctx} />}
       >
         <Switch>
           <Match when={statusUnion().idle}>
@@ -199,8 +175,7 @@ const MyTimelineContent: Component<{
               return (
                 <div ref={ref} id="timeline" style="position: relative;">
                   <TimelineItems
-                    appClient={props.appClient}
-                    bgmClient={props.bgmClient}
+                    ctx={props.ctx}
                     data={data()}
                     removeTimelineItem={removeTimelineItem}
                     setTooltipStuff={setTooltipStuff}
@@ -255,8 +230,7 @@ type ItemUnion = {
 };
 
 const TimelineItems: Component<{
-  appClient: AppClient;
-  bgmClient: BangumiClient;
+  ctx: Context;
   data: GetUserTimeLineItemsResponseData;
   removeTimelineItem: (timestampMs: number) => void;
   setTooltipStuff: Setter<TooltipStuff | null>;
@@ -332,7 +306,8 @@ const TimelineItems: Component<{
   const useVisibilityObserver = createVisibilityObserver();
 
   async function deleteTimelineItem(timestampMs: number) {
-    const result = await props.appClient.deleteMyTimelineItem({ timestampMs });
+    const result = await props.ctx.appClient
+      .deleteMyTimelineItem({ timestampMs });
     switch (result[0]) {
       case "ok":
         props.removeTimelineItem(timestampMs);
@@ -344,7 +319,7 @@ const TimelineItems: Component<{
       case "auth_required":
         // TODO: 同上。
         alert("认证失败。");
-        props.appClient.authStore.clear();
+        props.ctx.appClient.authStore.clear();
         break;
       default:
         result satisfies never;
@@ -361,8 +336,7 @@ const TimelineItems: Component<{
               <For each={group.items}>
                 {(item) => (
                   <TimelineItem
-                    appClient={props.appClient}
-                    bgmClient={props.bgmClient}
+                    ctx={props.ctx}
                     item={item}
                     now={now}
                     deleteTimelineItem={deleteTimelineItem}
@@ -380,8 +354,7 @@ const TimelineItems: Component<{
 };
 
 const TimelineItem: Component<{
-  appClient: AppClient;
-  bgmClient: BangumiClient;
+  ctx: Context;
   item: ItemUnion & { user: ItemUser };
   now: Date;
   deleteTimelineItem: (timestampMs: number) => void;
@@ -405,7 +378,7 @@ const TimelineItem: Component<{
         }
       })();
       if (subjectId) {
-        props.bgmClient.getSubjectEntry(subjectId).then(setSubject);
+        props.ctx.bgmClient.getSubjectEntry(subjectId).then(setSubject);
       }
 
       const episodeId = (() => {
@@ -414,7 +387,7 @@ const TimelineItem: Component<{
         }
       })();
       if (episodeId) {
-        props.bgmClient.getEpisodeTitle(episodeId).then(setEpTitle);
+        props.ctx.bgmClient.getEpisodeTitle(episodeId).then(setEpTitle);
       }
     }
   }));

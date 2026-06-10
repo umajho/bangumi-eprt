@@ -1,20 +1,10 @@
-import type { AppClient } from "../clients/app-client";
 import { createMyRatingInstance } from "../components/MyRating";
 import { createRateInfoInstance } from "../components/RateInfo";
+import type { Context } from "../context";
 import type { EpisodeId, SubjectId } from "../definitions";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import { createClearDivElement } from "../utils/elements";
 
-export function processSubjectEpListPage(opts: {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-
+export function processSubjectEpListPage(ctx: Context, opts: {
   subjectId: SubjectId;
 }) {
   const editEpBatchEl = document.querySelector('[name="edit_ep_batch"]');
@@ -48,34 +38,26 @@ export function processSubjectEpListPage(opts: {
       return false;
     })();
     if (hasUserWatched) {
-      opts.revealedEpisodesStore.reveal(episodeId);
+      ctx.revealedEpisodesStore.reveal(episodeId);
     }
 
     for (const aEl of liEl.querySelectorAll("a.ep_status")) {
       if (aEl.id.startsWith("Watched_")) {
         aEl.addEventListener("click", () => {
-          opts.revealedEpisodesStore.reveal(episodeId);
+          ctx.revealedEpisodesStore.reveal(episodeId);
         });
       }
     }
 
-    const myRatingInstance = createMyRatingInstance({
+    const myRatingInstance = createMyRatingInstance(ctx, {
       prefersFetchingCompleteSubjectVotes: true,
-      appClient: opts.appClient,
-      authStore: opts.authStore,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
       subjectId: opts.subjectId,
       episodeId,
       isPrimary: i === 0,
     });
     liEl.appendChild(myRatingInstance.element);
 
-    const rateInfoInstance = createRateInfoInstance({
-      settingsStore: opts.settingsStore,
-      appClient: opts.appClient,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
+    const rateInfoInstance = createRateInfoInstance(ctx, {
       subjectId: opts.subjectId,
       episodeId,
       isPrimary: i === 0,

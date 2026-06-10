@@ -1,13 +1,8 @@
-import type { AppClient } from "../clients/app-client";
+import type { Context } from "../context";
 import type { EpisodeId, SubjectId } from "../definitions";
 import { processCluetip } from "../element-processors/cluetip";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 
-export function processPrgList(opts: {
-  appClient: AppClient;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+export function processPrgList(ctx: Context, opts: {
   initializeCluetip: ReturnType<typeof processCluetip>["initializeCluetip"];
 
   prgListElement: HTMLUListElement;
@@ -35,14 +30,10 @@ export function processPrgList(opts: {
 
       const hasUserWatched = aEl.classList.contains("epBtnWatched");
       if (hasUserWatched) {
-        opts.revealedEpisodesStore.reveal(episodeId);
+        ctx.revealedEpisodesStore.reveal(episodeId);
       }
 
-      opts.initializeCluetip({
-        appClient: opts.appClient,
-        subjectId: opts.subjectId,
-        episodeId,
-      });
+      opts.initializeCluetip({ subjectId: opts.subjectId, episodeId });
     });
 
     liEl.addEventListener("mouseout", () => {

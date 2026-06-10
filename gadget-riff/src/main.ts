@@ -5,6 +5,7 @@ import {
   createSettingsTabSectionAuthInTheWildInstance,
   registerSettingsTab,
 } from "./components/SettingsTab";
+import type { Context, PrimalContext } from "./context";
 import {
   DEFAULT_API_ENTRYPOINT,
   DEFAULT_AUTH_ENTRYPOINT,
@@ -18,15 +19,11 @@ import { processRootPage } from "./page-processors/root";
 import { processSubjectPage } from "./page-processors/subject";
 import { processSubjectEpListPage } from "./page-processors/subject-ep-list";
 import {
-  type AuthStore,
   // type AuthStore,
   createAuthStore,
 } from "./stores/persistent-stores/auth-store";
 import { createEntryPointStore } from "./stores/persistent-stores/entrypoint-store";
-import {
-  createSettingsStore,
-  type SettingsStore,
-} from "./stores/persistent-stores/settings-store";
+import { createSettingsStore } from "./stores/persistent-stores/settings-store";
 import { readonlyPageData } from "./stores/readonly-page-data";
 import { createRevealedEpisodesStore } from "./stores/temporary-global-stores/revealed-episodes-store";
 import { createScoreStore } from "./stores/temporary-global-stores/score-store";
@@ -51,7 +48,9 @@ async function main() {
   const appClient = new AppClient({ entrypointStore, authStore });
   const bgmClient = new BangumiClient();
 
-  setUpAuthRelatedStuff({ authStore });
+  const pCtx: PrimalContext = { settingsStore, authStore, appClient };
+
+  setUpAuthRelatedStuff(pCtx);
 
   setUpCustomizationPanelTab({ settingsStore, authStore, appClient });
 
@@ -59,29 +58,24 @@ async function main() {
   const scoreStore = //
     createScoreStore({ authStore, appClient, revealedEpisodesStore });
 
+  const ctx: Context = {
+    ...pCtx,
+    entrypointStore,
+    authClient,
+    bgmClient,
+    revealedEpisodesStore,
+    scoreStore,
+  };
+
   switch (detectPageType()) {
     case "root": {
-      processRootPage({
-        settingsStore,
-        appClient,
-        bgmClient,
-        authStore,
-        scoreStore,
-        revealedEpisodesStore,
-      });
+      processRootPage(ctx);
       break;
     }
     case "subject": {
       const subjectId = readonlyPageData.subjectId;
       if (subjectId) {
-        processSubjectPage({
-          settingsStore,
-          appClient,
-          authStore,
-          scoreStore,
-          revealedEpisodesStore,
-          subjectId,
-        });
+        processSubjectPage(ctx, { subjectId });
       }
 
       break;
@@ -89,14 +83,7 @@ async function main() {
     case "subject_ep_list": {
       const subjectId = readonlyPageData.subjectId;
       if (subjectId) {
-        processSubjectEpListPage({
-          settingsStore,
-          appClient,
-          authStore,
-          scoreStore,
-          revealedEpisodesStore,
-          subjectId,
-        });
+        processSubjectEpListPage(ctx, { subjectId });
       }
       break;
     }
@@ -104,15 +91,7 @@ async function main() {
       const subjectId = readonlyPageData.subjectId;
       const episodeId = readonlyPageData.episodeId;
       if (subjectId && episodeId) {
-        processEpPage({
-          settingsStore,
-          appClient,
-          authStore,
-          scoreStore,
-          revealedEpisodesStore,
-          subjectId,
-          episodeId,
-        });
+        processEpPage(ctx, { subjectId, episodeId });
       }
       break;
     }
@@ -134,14 +113,14 @@ async function migrate() {
   }
 }
 
-function setUpAuthRelatedStuff({ authStore }: { authStore: AuthStore }) {
+function setUpAuthRelatedStuff(ctx: PrimalContext) {
   { // `showCustomizePanelWithTab` 用不了的替代方案：
     const aEl = document.querySelector(
       '[href="https://_/__umajho_bangumi_eprt__anchor_auth_status"]',
     );
     if (!aEl) return;
     const sectionAuthEl = //
-      createSettingsTabSectionAuthInTheWildInstance({ authStore });
+      createSettingsTabSectionAuthInTheWildInstance(ctx);
     aEl.replaceWith(sectionAuthEl.element);
   }
 
@@ -158,21 +137,17 @@ function setUpAuthRelatedStuff({ authStore }: { authStore: AuthStore }) {
     // 没用，也许是还没准备好：
     // chiiLib.ukagaka.showCustomizePanelWithTab(EPRT_ID_HTML_SAFE);
 
-    authStore.redeemTokenCoupon(tokenCoupon);
+    ctx.authStore.redeemTokenCoupon(tokenCoupon);
   }
 }
 
-function setUpCustomizationPanelTab(opts: {
-  settingsStore: SettingsStore;
-  authStore: AuthStore;
-  appClient: AppClient;
-}) {
+function setUpCustomizationPanelTab(ctx: PrimalContext) {
   chiiLib.ukagaka.addPanelTab({
     tab: EPRT_ID_HTML_SAFE,
     label: "单集评分",
     type: "custom",
     customContent: () => {
-      const r = registerSettingsTab(opts);
+      const r = registerSettingsTab(ctx);
       if (!/^[a-z-]+$/.test(r.tagName)) {
         throw new Error(
           `No way the tag name is \`${

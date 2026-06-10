@@ -1,20 +1,10 @@
-import type { AppClient } from "../clients/app-client";
 import { createMyRatingInstance } from "../components/MyRating";
 import { createRateInfoInstance } from "../components/RateInfo";
+import type { Context } from "../context";
 import type { EpisodeId, SubjectId } from "../definitions";
-import type { AuthStore } from "../stores/persistent-stores/auth-store";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import { createClearDivElement } from "../utils/elements";
 
-export function processMusicSubjectEpSection(opts: {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  authStore: AuthStore;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-
+export function processMusicSubjectEpSection(ctx: Context, opts: {
   subjectEpSection: HTMLDivElement;
   subjectId: SubjectId;
 }) {
@@ -38,14 +28,10 @@ export function processMusicSubjectEpSection(opts: {
     })();
     if (episodeId === null) continue;
 
-    const myRatingInstance = createMyRatingInstance({
+    const myRatingInstance = createMyRatingInstance(ctx, {
       displayMode: "inline_compact",
       noFloat: true,
       prefersFetchingCompleteSubjectVotes: true,
-      appClient: opts.appClient,
-      authStore: opts.authStore,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
       subjectId: opts.subjectId,
       episodeId,
       isPrimary: i === 0,
@@ -53,12 +39,8 @@ export function processMusicSubjectEpSection(opts: {
     citeEl.prepend(createSpacingSpan());
     citeEl.prepend(myRatingInstance.element);
 
-    const rateInfoInstance = createRateInfoInstance({
+    const rateInfoInstance = createRateInfoInstance(ctx, {
       displayMode: "inline_compact",
-      settingsStore: opts.settingsStore,
-      appClient: opts.appClient,
-      scoreStore: opts.scoreStore,
-      revealedEpisodesStore: opts.revealedEpisodesStore,
       subjectId: opts.subjectId,
       episodeId,
       isMusic: true,

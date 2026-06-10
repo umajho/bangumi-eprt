@@ -15,25 +15,17 @@ import {
   makeCustomElementTagName,
   type SubjectId,
 } from "../definitions";
-import type { AppClient } from "../clients/app-client";
-import type { ScoreStore } from "../stores/temporary-global-stores/score-store";
 import { SmallStars } from "./SmallStars";
 import { ErrorMessageWithRetry } from "./errors";
-import type { RevealedEpisodesStore } from "../stores/temporary-global-stores/revealed-episodes-store";
 import * as epDataHelpers from "../utils/episode-data-helpers";
-import type { SettingsStore } from "../stores/persistent-stores/settings-store";
+import type { Context } from "../context";
 
 const TAG_NAME = makeCustomElementTagName("rate-info");
 
 type DisplayMode = "normal" | "inline_compact";
 
-export function createRateInfoInstance(opts: {
+export function createRateInfoInstance(ctx: Context, opts: {
   displayMode?: DisplayMode;
-
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
@@ -41,12 +33,7 @@ export function createRateInfoInstance(opts: {
   isPrimary?: boolean;
   revealAllButton?: boolean;
 }) {
-  registerRateInfo({
-    settingsStore: opts.settingsStore,
-    appClient: opts.appClient,
-    scoreStore: opts.scoreStore,
-    revealedEpisodesStore: opts.revealedEpisodesStore,
-  });
+  registerRateInfo(ctx);
   const el = document.createElement(TAG_NAME);
   if (opts.displayMode) {
     el.setAttribute("display-mode", opts.displayMode);
@@ -68,12 +55,7 @@ export function createRateInfoInstance(opts: {
 
 let elementConstructor: CustomElementConstructor | null = null;
 
-function registerRateInfo(opts: {
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
-}) {
+function registerRateInfo(ctx: Context) {
   elementConstructor ??= customElement(TAG_NAME, {
     displayMode: null,
     episodeId: null,
@@ -91,10 +73,7 @@ function registerRateInfo(opts: {
       >
         <RateInfo
           displayMode={props.displayMode ?? "normal"}
-          settingsStore={opts.settingsStore}
-          appClient={opts.appClient}
-          scoreStore={opts.scoreStore}
-          revealedEpisodesStore={opts.revealedEpisodesStore}
+          ctx={ctx}
           subjectId={props.subjectId!}
           episodeId={props.episodeId!}
           isMusic={!!props.isMusic}
@@ -109,10 +88,7 @@ function registerRateInfo(opts: {
 const RateInfo: Component<{
   displayMode: DisplayMode;
 
-  settingsStore: SettingsStore;
-  appClient: AppClient;
-  scoreStore: ScoreStore;
-  revealedEpisodesStore: RevealedEpisodesStore;
+  ctx: Context;
 
   subjectId: SubjectId;
   episodeId: EpisodeId;
@@ -121,7 +97,7 @@ const RateInfo: Component<{
   revealAllButton: boolean;
 }> = (props) => {
   function queryEpisodeDataTracked(opts: { shouldRefetch: boolean }) {
-    return props.scoreStore.queryEpisodeDataTracked(
+    return props.ctx.scoreStore.queryEpisodeDataTracked(
       props.subjectId,
       props.episodeId,
       {
@@ -136,7 +112,7 @@ const RateInfo: Component<{
 
   const [shouldHide, setShouldHide] = createSignal(false);
   if (props.isMusic) {
-    const antiSpoilerOption = props.settingsStore
+    const antiSpoilerOption = props.ctx.settingsStore
       .getAntiSpoilerForMusicSignal();
     createEffect(() => {
       setShouldHide(antiSpoilerOption() === "not-showing-at-all");
@@ -152,7 +128,7 @@ const RateInfo: Component<{
     const resp = epDataResp();
     return resp[0] === "error" ? resp[2] : null;
   });
-  const isRevealedSignal = props.revealedEpisodesStore
+  const isRevealedSignal = props.ctx.revealedEpisodesStore
     .getIsRevealedAccessor(props.episodeId, { isMusic: props.isMusic });
 
   return ( // `div` 用于确保换行。
@@ -173,8 +149,8 @@ const RateInfo: Component<{
                 votes={votes()}
                 isRevealed={isRevealedSignal()}
                 reveal={() =>
-                  props.revealedEpisodesStore.reveal(props.episodeId)}
-                revealAll={() => props.revealedEpisodesStore.revealAll()}
+                  props.ctx.revealedEpisodesStore.reveal(props.episodeId)}
+                revealAll={() => props.ctx.revealedEpisodesStore.revealAll()}
               />
             </Show>
           )}
