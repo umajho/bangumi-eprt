@@ -12,6 +12,7 @@ import {
   EPRT_ID_HTML_SAFE,
   LEGACY_SEARCH_PARAMS_KEY_TOKEN_COUPON,
   LOCAL_STORAGE_KEY_SESSION_TOKEN,
+  makeSpecialAnchorUrl,
   // LOCAL_STORAGE_KEY_SESSION_TOKEN,
 } from "./definitions";
 import { processEpPage } from "./page-processors/ep";
@@ -116,7 +117,7 @@ async function migrate() {
 function setUpAuthRelatedStuff(ctx: PrimalContext) {
   { // `showCustomizePanelWithTab` 用不了的替代方案：
     const aEl = document.querySelector(
-      '[href="https://_/__umajho_bangumi_eprt__anchor_auth_status"]',
+      `[href="${makeSpecialAnchorUrl("auth_status")}"]`,
     );
     if (!aEl) return;
     const sectionAuthEl = //

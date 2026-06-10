@@ -35,6 +35,12 @@ export function makeHtmlId<T extends string>(
   return `${EPRT_ID_HTML_SAFE}-${name}`;
 }
 
+export function makeSpecialAnchorUrl<T extends string>(
+  name: T,
+): `https://_/${typeof EPRT_ID_ASCII_SAFE}/${T}` {
+  return `https://_/${EPRT_ID_ASCII_SAFE}/${name}`;
+}
+
 export const GADGET_VERSION = PackageJson.version;
 
 export const LOCAL_STORAGE_KEY_SESSION_TOKEN = //
