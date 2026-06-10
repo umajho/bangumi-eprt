@@ -91,7 +91,7 @@ export function createSettingsStore() {
     update("antiSpoilerForMusic", value);
   }
   function getAntiSpoilerForMusicValues(): SettingAntiSpoilerForMusicOption[] {
-    return ["off", "on-for-not-rated", "not-showing-at-all"];
+    return ["not-showing-at-all", "off", "on-for-not-rated"];
   }
   function getAntiSpoilerForMusicValueLabelText(
     value: SettingAntiSpoilerForMusicOption,

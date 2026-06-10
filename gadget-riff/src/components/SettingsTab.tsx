@@ -63,10 +63,19 @@ const SettingsTab: Component<{ ctx: PrimalContext }> = (props) => {
       </div>
       <SectionAuth ctx={props.ctx} />
       <SectionExportData ctx={props.ctx} />
-      <SectionAntiSpoiler ctx={props.ctx} status={status()} />
-      <SectionAntiSpoilerForMusic ctx={props.ctx} status={status()} />
-      <SectionTimelineTabButtonLocation ctx={props.ctx} status={status()} />
-      <SectionEpisodePageOverviewStyle ctx={props.ctx} status={status()} />
+      <div class="section">
+        <h2 class="title">通用</h2>
+        <SectionAntiSpoiler ctx={props.ctx} status={status()} />
+        <SectionEpisodePageOverviewStyle ctx={props.ctx} status={status()} />
+      </div>
+      <div class="section">
+        <h2 class="title">音乐</h2>
+        <SectionAntiSpoilerForMusic ctx={props.ctx} status={status()} />
+      </div>
+      <div class="section">
+        <h2 class="title">时间线</h2>
+        <SectionTimelineTabButtonLocation ctx={props.ctx} status={status()} />
+      </div>
     </div>
   );
 };
@@ -229,7 +238,7 @@ const SectionAntiSpoiler: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <div class="title">章节评分防剧透</div>
+      <h3 class="title">章节评分防剧透</h3>
       <RadioGroup
         currentValue={optAntiSpoiler()}
         options={props.ctx.settingsStore.getAntiSpoilerValues()}
@@ -250,7 +259,7 @@ const SectionAntiSpoilerForMusic: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <div class="title">音乐概览页面各曲目的整体评分</div>
+      <h3 class="title">音乐概览页面各曲目的整体评分</h3>
       <RadioGroup
         currentValue={optAntiSpoilerForMusic()}
         options={props.ctx.settingsStore.getAntiSpoilerForMusicValues()}
@@ -271,7 +280,7 @@ const SectionTimelineTabButtonLocation: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <div class="title">时间线标签页按钮位置</div>
+      <h3 class="title">时间线标签页按钮位置</h3>
       <RadioGroup
         currentValue={optTimelineTabButtonLocation()}
         options={props.ctx.settingsStore.getTimelineTabButtonLocationValues()}
@@ -295,7 +304,7 @@ const SectionEpisodePageOverviewStyle: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <div class="title">章节页面概览显示风格</div>
+      <h3 class="title">章节页面头部信息显示风格</h3>
       <RadioGroup
         currentValue={optEpisodePageOverviewStyle()}
         options={props.ctx.settingsStore.getEpisodePageOverviewStyleValues()}
