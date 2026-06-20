@@ -13,6 +13,8 @@ type SettingAntiSpoilerForMusicOption =
   | "not-showing-at-all";
 type SettingTimelineTabButtonLocation = "more-dropdown" | "main-row";
 type SettingEpisodePageOverviewStyle = "boxed" | "compact";
+type SettingMusicSubjectPageTrackListRaterDisplay = "show" | "hide" | "switch";
+type SettingMusicSubjectPageTrackListRaterStyle = "direct" | "compact";
 
 export interface SettingsStatus {
   ready?: true;
@@ -25,6 +27,10 @@ export interface Settings {
   antiSpoilerForMusic?: SettingAntiSpoilerForMusicOption;
   timelineTabButtonLocation?: SettingTimelineTabButtonLocation;
   episodePageOverviewStyle?: SettingEpisodePageOverviewStyle;
+  musicSubjectPageTrackListRaterDisplay?:
+    SettingMusicSubjectPageTrackListRaterDisplay;
+  musicSubjectPageTrackListRaterStyle?:
+    SettingMusicSubjectPageTrackListRaterStyle;
 }
 
 const DEFAULT_SETTINGS: Required<Settings> = {
@@ -32,6 +38,8 @@ const DEFAULT_SETTINGS: Required<Settings> = {
   antiSpoilerForMusic: "off",
   timelineTabButtonLocation: "more-dropdown",
   episodePageOverviewStyle: "boxed",
+  musicSubjectPageTrackListRaterDisplay: "show",
+  musicSubjectPageTrackListRaterStyle: "direct",
 };
 
 export function createSettingsStore() {
@@ -155,6 +163,52 @@ export function createSettingsStore() {
         DEFAULT_SETTINGS.episodePageOverviewStyle;
   }
 
+  function updateMusicSubjectPageTrackListRaterDisplay(
+    value: SettingMusicSubjectPageTrackListRaterDisplay,
+  ) {
+    update("musicSubjectPageTrackListRaterDisplay", value);
+  }
+  function getMusicSubjectPageTrackListRaterDisplayValues(): SettingMusicSubjectPageTrackListRaterDisplay[] {
+    return ["show", "hide", "switch"];
+  }
+  function getMusicSubjectPageTrackListRaterDisplayValueLabelText(
+    value: SettingMusicSubjectPageTrackListRaterDisplay,
+  ): string {
+    return {
+      "show": "显示",
+      "hide": "不显示",
+      "switch": "默认不显示，通过曲目列表上方按钮切换",
+    }[value];
+  }
+  function getMusicSubjectPageTrackListRaterDisplaySignal(): Accessor<
+    SettingMusicSubjectPageTrackListRaterDisplay
+  > {
+    return () =>
+      store.musicSubjectPageTrackListRaterDisplay ??
+        DEFAULT_SETTINGS.musicSubjectPageTrackListRaterDisplay;
+  }
+
+  function updateMusicSubjectPageTrackListRaterStyle(
+    value: SettingMusicSubjectPageTrackListRaterStyle,
+  ) {
+    update("musicSubjectPageTrackListRaterStyle", value);
+  }
+  function getMusicSubjectPageTrackListRaterStyleValues(): SettingMusicSubjectPageTrackListRaterStyle[] {
+    return ["direct", "compact"];
+  }
+  function getMusicSubjectPageTrackListRaterStyleValueLabelText(
+    value: SettingMusicSubjectPageTrackListRaterStyle,
+  ): string {
+    return { "direct": "直接式", "compact": "紧凑式" }[value];
+  }
+  function getMusicSubjectPageTrackListRaterStyleSignal(): Accessor<
+    SettingMusicSubjectPageTrackListRaterStyle
+  > {
+    return () =>
+      store.musicSubjectPageTrackListRaterStyle ??
+        DEFAULT_SETTINGS.musicSubjectPageTrackListRaterStyle;
+  }
+
   return {
     getStatusSignal: () => status,
     updateAntiSpoiler,
@@ -173,6 +227,14 @@ export function createSettingsStore() {
     getEpisodePageOverviewStyleValues,
     getEpisodePageOverviewStyleValueLabelText,
     getEpisodePageOverviewStyleSignal,
+    updateMusicSubjectPageTrackListRaterDisplay,
+    getMusicSubjectPageTrackListRaterDisplayValues,
+    getMusicSubjectPageTrackListRaterDisplayValueLabelText,
+    getMusicSubjectPageTrackListRaterDisplaySignal,
+    updateMusicSubjectPageTrackListRaterStyle,
+    getMusicSubjectPageTrackListRaterStyleValues,
+    getMusicSubjectPageTrackListRaterStyleValueLabelText,
+    getMusicSubjectPageTrackListRaterStyleSignal,
   };
 }
 

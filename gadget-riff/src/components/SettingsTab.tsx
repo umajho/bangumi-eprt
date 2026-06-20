@@ -71,6 +71,14 @@ const SettingsTab: Component<{ ctx: PrimalContext }> = (props) => {
       <div class="section">
         <h2 class="title">音乐</h2>
         <SectionAntiSpoilerForMusic ctx={props.ctx} status={status()} />
+        <SectionMusicSubjectPageTrackListRaterDisplay
+          ctx={props.ctx}
+          status={status()}
+        />
+        <SectionMusicSubjectPageTrackListRaterStyle
+          ctx={props.ctx}
+          status={status()}
+        />
       </div>
       <div class="section">
         <h2 class="title">时间线</h2>
@@ -259,7 +267,7 @@ const SectionAntiSpoilerForMusic: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <h3 class="title">音乐概览页面各曲目的整体评分</h3>
+      <h3 class="title">音乐概览页面曲目列表各曲目整体评分的显示</h3>
       <RadioGroup
         currentValue={optAntiSpoilerForMusic()}
         options={props.ctx.settingsStore.getAntiSpoilerForMusicValues()}
@@ -304,7 +312,7 @@ const SectionEpisodePageOverviewStyle: Component<{
 
   return (
     <DisableableSection disabled={!!props.status.saving}>
-      <h3 class="title">章节页面头部信息显示风格</h3>
+      <h3 class="title">章节页面头部信息的显示风格</h3>
       <RadioGroup
         currentValue={optEpisodePageOverviewStyle()}
         options={props.ctx.settingsStore.getEpisodePageOverviewStyleValues()}
@@ -314,6 +322,55 @@ const SectionEpisodePageOverviewStyle: Component<{
           )}
         setValue={(v) =>
           props.ctx.settingsStore.updateEpisodePageOverviewStyle(v)}
+      />
+    </DisableableSection>
+  );
+};
+
+const SectionMusicSubjectPageTrackListRaterDisplay: Component<{
+  ctx: PrimalContext;
+  status: SettingsStatus;
+}> = (props) => {
+  const optMusicSubjectPageTrackListRaterDisplay = props.ctx.settingsStore
+    .getMusicSubjectPageTrackListRaterDisplaySignal();
+
+  return (
+    <DisableableSection disabled={!!props.status.saving}>
+      <h3 class="title">音乐概览页面曲目列表评分用控件的显示</h3>
+      <RadioGroup
+        currentValue={optMusicSubjectPageTrackListRaterDisplay()}
+        options={props.ctx.settingsStore
+          .getMusicSubjectPageTrackListRaterDisplayValues()}
+        getLabel={(value) =>
+          props.ctx.settingsStore
+            .getMusicSubjectPageTrackListRaterDisplayValueLabelText(value)}
+        setValue={(v) =>
+          props.ctx.settingsStore
+            .updateMusicSubjectPageTrackListRaterDisplay(v)}
+      />
+    </DisableableSection>
+  );
+};
+
+const SectionMusicSubjectPageTrackListRaterStyle: Component<{
+  ctx: PrimalContext;
+  status: SettingsStatus;
+}> = (props) => {
+  const optMusicSubjectPageTrackListRaterStyle = props.ctx.settingsStore
+    .getMusicSubjectPageTrackListRaterStyleSignal();
+
+  return (
+    <DisableableSection disabled={!!props.status.saving}>
+      <h3 class="title">音乐概览页面曲目列表评分用控件的显示风格</h3>
+      <RadioGroup
+        currentValue={optMusicSubjectPageTrackListRaterStyle()}
+        options={props.ctx.settingsStore
+          .getMusicSubjectPageTrackListRaterStyleValues()}
+        getLabel={(value) =>
+          props.ctx.settingsStore
+            .getMusicSubjectPageTrackListRaterStyleValueLabelText(value)}
+        setValue={(v) =>
+          props.ctx.settingsStore.updateMusicSubjectPageTrackListRaterStyle(v)}
       />
     </DisableableSection>
   );

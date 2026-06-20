@@ -15,7 +15,7 @@ import type {
 } from "../stores/temporary-global-stores/score-store";
 import { createClearDivElement } from "../utils/elements";
 import { createSmallStarsInstance } from "../components/SmallStars";
-import { createMyRatingInCommentInstance } from "../components/MyRatingInComment";
+import { createMyRatingCompactInstance } from "../components/MyRatingCompact";
 import { createMyRatingInstance } from "../components/MyRating";
 import type { Context } from "../context";
 
@@ -23,6 +23,8 @@ export async function processEpPage(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
+  collectCacheEntries(ctx);
+
   const columnEpAEl = document.querySelector("#columnEpA");
   const epDescEl = columnEpAEl?.querySelector(":scope > .epDesc");
   if (!columnEpAEl || !epDescEl) return;
@@ -58,6 +60,26 @@ export async function processEpPage(ctx: Context, opts: {
       subjectId: opts.subjectId,
       episodeId: opts.episodeId,
     });
+  }
+}
+
+function collectCacheEntries(ctx: Context) {
+  // TODO: `putEntryIntoSubjectCache`.
+
+  for (const aEl of document.querySelectorAll(".sideEpList > li > a.l")) {
+    const href = aEl.getAttribute("href");
+    const text = aEl.textContent;
+    if (!href || !text) continue;
+
+    const episodeId = Number(href.split("/").at(-1)) as EpisodeId;
+    const m = /^ep\.(.+?) (.+)$/.exec(text);
+    if (isNaN(episodeId) || !m) continue;
+
+    const sort = Number(m[1]);
+    const name = m[2];
+    if (isNaN(sort)) continue;
+
+    ctx.bgmClient.putEntryIntoEpisodeCache(episodeId, { name, sort });
   }
 }
 
@@ -139,7 +161,7 @@ function processMyRatingsInComments(ctx: Context, opts: {
         .querySelector(".inner > .reply_content,.cmt_sub_content");
       if (!contentEl) continue;
 
-      const instance = createMyRatingInCommentInstance(ctx, opts);
+      const instance = createMyRatingCompactInstance(ctx, opts);
       contentEl.insertAdjacentElement("beforebegin", instance.element);
       instance.element.insertAdjacentText("beforebegin", " ");
       instance.element.insertAdjacentText("afterend", " ");

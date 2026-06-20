@@ -161,8 +161,8 @@ export const MyRating: Component<{
     queryEpisodeDataTracked({ shouldRefetch: true });
   }
 
-  const epDataResp = queryEpisodeDataTracked({ shouldRefetch: false });
   createEffect(() => {
+    const epDataResp = queryEpisodeDataTracked({ shouldRefetch: false });
     const resp = epDataResp();
     switch (resp[0]) {
       case "ok": {

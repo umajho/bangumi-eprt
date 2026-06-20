@@ -26,6 +26,7 @@ import {
 import { createEntryPointStore } from "./stores/persistent-stores/entrypoint-store";
 import { createSettingsStore } from "./stores/persistent-stores/settings-store";
 import { readonlyPageData } from "./stores/readonly-page-data";
+import { createMiscStore } from "./stores/temporary-global-stores/misc-store";
 import { createRevealedEpisodesStore } from "./stores/temporary-global-stores/revealed-episodes-store";
 import { createScoreStore } from "./stores/temporary-global-stores/score-store";
 
@@ -58,6 +59,7 @@ async function main() {
   const revealedEpisodesStore = createRevealedEpisodesStore({ settingsStore });
   const scoreStore = //
     createScoreStore({ authStore, appClient, revealedEpisodesStore });
+  const miscStore = createMiscStore();
 
   const ctx: Context = {
     ...pCtx,
@@ -66,6 +68,7 @@ async function main() {
     bgmClient,
     revealedEpisodesStore,
     scoreStore,
+    miscStore,
   };
 
   switch (detectPageType()) {

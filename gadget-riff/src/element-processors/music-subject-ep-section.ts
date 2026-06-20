@@ -1,4 +1,5 @@
-import { createMyRatingInstance } from "../components/MyRating";
+import { createMusicTrackListRaterSwitchInstance } from "../components/MusicTrackLisctRaterSwitch";
+import { createMyRatingForTrackListItemInstance } from "../components/MyRatingForMusicTrackListItem";
 import { createRateInfoInstance } from "../components/RateInfo";
 import type { Context } from "../context";
 import type { EpisodeId, SubjectId } from "../definitions";
@@ -8,6 +9,14 @@ export function processMusicSubjectEpSection(ctx: Context, opts: {
   subjectEpSection: HTMLDivElement;
   subjectId: SubjectId;
 }) {
+  collectCacheEntries(ctx, { subjectEpSection: opts.subjectEpSection });
+
+  const subtitle = opts.subjectEpSection.querySelector(":scope > h2.subtitle");
+  if (subtitle) {
+    const instance = createMusicTrackListRaterSwitchInstance(ctx);
+    subtitle.appendChild(instance.element);
+  }
+
   for (
     const [i, liEl] of [
       ...opts.subjectEpSection.querySelectorAll(".line_list > li"),
@@ -28,10 +37,7 @@ export function processMusicSubjectEpSection(ctx: Context, opts: {
     })();
     if (episodeId === null) continue;
 
-    const myRatingInstance = createMyRatingInstance(ctx, {
-      displayMode: "inline_compact",
-      noFloat: true,
-      prefersFetchingCompleteSubjectVotes: true,
+    const myRatingInstance = createMyRatingForTrackListItemInstance(ctx, {
       subjectId: opts.subjectId,
       episodeId,
       isPrimary: i === 0,
@@ -51,6 +57,36 @@ export function processMusicSubjectEpSection(ctx: Context, opts: {
     h6El.appendChild(rateInfoInstance.element);
 
     liEl.appendChild(createClearDivElement());
+  }
+}
+
+function collectCacheEntries(ctx: Context, opts: {
+  subjectEpSection: HTMLDivElement;
+}) {
+  // TODO: `putEntryIntoSubjectCache`.
+
+  for (
+    const liEl of [
+      ...opts.subjectEpSection.querySelectorAll(".line_list > li"),
+    ]
+      .filter((li) => li.querySelector("cite"))
+  ) {
+    const aEl = liEl.querySelector("h6 > a");
+    if (!aEl) continue;
+
+    const href = aEl.getAttribute("href");
+    const text = aEl.textContent;
+    if (!href || !text) continue;
+
+    const episodeId = Number(href.split("/").at(-1)) as EpisodeId;
+    const m = /^(\d+) (.+)$/.exec(text);
+    if (isNaN(episodeId) || !m) continue;
+
+    const sort = Number(m[1]);
+    const name = m[2];
+    if (isNaN(sort)) continue;
+
+    ctx.bgmClient.putEntryIntoEpisodeCache(episodeId, { name, sort });
   }
 }
 
