@@ -174,6 +174,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   onCleanup(() => {
     resizeObserver?.disconnect();
     mo?.disconnect();
+    if (wheelGestureTimer !== null) clearTimeout(wheelGestureTimer);
   });
 
   onMount(() => {
@@ -365,52 +366,75 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     (ev.target as Element).releasePointerCapture?.(ev.pointerId);
   };
 
-  // 滚轮 / 触摸板：deltaX 平移、ctrl+deltaY 缩放、普通 deltaY 平移
+  // 滚轮 / 触摸板：
+  //   - 垂直滚动（鼠标滚轮 / 触摸板双指垂直）→ 水平缩放（围绕指针位置）
+  //   - 触摸板双指捏合（ctrlKey）→ 缩放
+  //   - 触摸板水平手势（|deltaX| 主导）→ 水平平移
+  // 手势锁定：在连续 wheel 事件中保持首次分类不变，避免水平平移过程中
+  // 因垂直漂移事件误触发缩放；事件空闲超过阈值后手势结束，重新分类。
+  let wheelGesture: "none" | "pan" | "zoom" = "none";
+  let wheelGestureTimer: ReturnType<typeof setTimeout> | null = null;
+  const WHEEL_GESTURE_IDLE_MS = 200;
+
   const onWheel = (ev: WheelEvent) => {
     ev.preventDefault();
     if (!containerRef) return;
 
-    // 触摸板双指捏合缩放（ctrlKey）
-    if (ev.ctrlKey || ev.metaKey) {
-      const rect = containerRef.getBoundingClientRect();
-      const mouseX = ev.clientX - rect.left;
-      const innerX = Math.min(
-        Math.max(0, mouseX - PADDING_LEFT),
-        innerWidth(),
-      );
-      const ratio = innerWidth() > 0 ? innerX / innerWidth() : 0;
+    // 续期手势：每次 wheel 事件都重置空闲计时器
+    if (wheelGestureTimer !== null) clearTimeout(wheelGestureTimer);
+    wheelGestureTimer = setTimeout(() => {
+      wheelGesture = "none";
+      wheelGestureTimer = null;
+    }, WHEEL_GESTURE_IDLE_MS);
 
-      const oldZoom = zoom();
-      const factor = ev.deltaY < 0 ? 1.1 : 1 / 1.1;
-      const newZoom = Math.min(
-        Math.max(MIN_ZOOM, oldZoom * factor),
-        MAX_ZOOM,
-      );
-      if (newZoom === oldZoom) return;
+    // 手势起始时按主轴分类；一旦分类，在本手势内保持不变
+    if (wheelGesture === "none") {
+      const isPinch = ev.ctrlKey || ev.metaKey;
+      if (isPinch) wheelGesture = "zoom";
+      else if (Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) wheelGesture = "pan";
+      else wheelGesture = "zoom";
+    }
 
-      const dom = xDomain();
-      const span = dom.max - dom.min || 1;
-      const oldVisible = span / oldZoom;
-      const oldPan = panOffset();
-      const anchorTime = dom.min + oldPan + ratio * oldVisible;
-      const newVisible = span / newZoom;
-      let newPan = anchorTime - dom.min - ratio * newVisible;
-      const maxPan = Math.max(0, span - newVisible);
-      newPan = Math.min(Math.max(0, newPan), maxPan);
-      setZoom(newZoom);
-      setPanOffset(newPan);
+    if (wheelGesture === "pan") {
+      // 遵循平台原生滚动方向：向右滑动 → 查看右侧（更晚）内容 → pan 增大
+      if (ev.deltaX === 0) return;
+      const v = viewDomain();
+      const timeDelta = (ev.deltaX / (innerWidth() || 1)) * v.visibleSpan;
+      const newPan = panOffset() + timeDelta;
+      setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
       return;
     }
 
-    // 平移：优先 deltaX（触摸板水平手势），否则用 deltaY（垂直滚动也作水平平移）
-    // 遵循平台原生滚动方向：向右滑动 → 查看右侧（更晚）内容 → pan 增大
-    const delta = ev.deltaX !== 0 ? ev.deltaX : ev.deltaY;
-    if (delta === 0) return;
-    const v = viewDomain();
-    // 像素 → 时间转换
-    const timeDelta = (delta / (innerWidth() || 1)) * v.visibleSpan;
-    const newPan = panOffset() + timeDelta;
-    setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
+    // 缩放（鼠标滚轮 / 触摸板垂直 / 捏合）：围绕指针位置
+    if (ev.deltaY === 0) return;
+
+    const rect = containerRef.getBoundingClientRect();
+    const mouseX = ev.clientX - rect.left;
+    const innerX = Math.min(
+      Math.max(0, mouseX - PADDING_LEFT),
+      innerWidth(),
+    );
+    const ratio = innerWidth() > 0 ? innerX / innerWidth() : 0;
+
+    const oldZoom = zoom();
+    const factor = ev.deltaY < 0 ? 1.1 : 1 / 1.1;
+    const newZoom = Math.min(
+      Math.max(MIN_ZOOM, oldZoom * factor),
+      MAX_ZOOM,
+    );
+    if (newZoom === oldZoom) return;
+
+    const dom = xDomain();
+    const span = dom.max - dom.min || 1;
+    const oldVisible = span / oldZoom;
+    const oldPan = panOffset();
+    const anchorTime = dom.min + oldPan + ratio * oldVisible;
+    const newVisible = span / newZoom;
+    let newPan = anchorTime - dom.min - ratio * newVisible;
+    const maxPan = Math.max(0, span - newVisible);
+    newPan = Math.min(Math.max(0, newPan), maxPan);
+    setZoom(newZoom);
+    setPanOffset(newPan);
   };
 
   // 触摸交互：单指拖动平移 + tap 选择；双指捏合缩放
