@@ -133,7 +133,7 @@ function collectItems(opts: { editEpBatchEl: HTMLFormElement }): Item[] {
     const title = aEl.textContent;
     if (!title) continue;
 
-    const m = /^([a-zA-Z]*)(\d+?)\.(.+)$/.exec(title);
+    const m = /^([a-zA-Z]*)(\d+?)\.(.*)$/.exec(title);
     if (!m) continue;
 
     const sortPrefix = m[1];

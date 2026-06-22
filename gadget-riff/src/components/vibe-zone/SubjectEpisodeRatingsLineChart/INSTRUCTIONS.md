@@ -116,7 +116,7 @@ The hover cursor must snap only to these episode positions.
 This is a follow-up to “`0.100.2` @ 1”.
 
 - Instruction polisher: `GPT-5.5`
-- Executor: `XXX`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
 
 ### Additional Requirements
 
@@ -205,3 +205,235 @@ Symptoms:
   1000 episodes. (Chrome shows “Page Unresponsive” and offers to kill the tab.)
 
 Optimize the implementation.
+
+## `0.100.3` @ 1
+
+This is a follow-up to “`0.100.2` @ 2”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
+
+### Bugs to Fix
+
+#### Touch Dragging
+
+Horizontal dragging/panning does not work on touch devices.
+
+Fix touch interaction so that users can drag horizontally to navigate the chart.
+
+### Additional Requirements
+
+#### Trackpad Navigation
+
+Support horizontal navigation using touchpad / trackpad gestures, including:
+
+- Apple Magic Trackpad gestures.
+- Standard two-finger horizontal scrolling gestures.
+- Equivalent gestures on other platforms.
+
+The chart should respond naturally to platform-native scrolling behavior.
+
+#### Episode Title Links
+
+Episode titles should link to the corresponding episode page:
+
+```text
+/ep/{episodeId}
+```
+
+Interaction requirements:
+
+##### Touch Devices
+
+- The first tap anywhere on the chart selects the nearest episode.
+- The first tap on an episode title must also only select that episode.
+- If that episode is already selected, a subsequent tap on its title should
+  follow the link.
+- Tapping a different title should select that episode instead of navigating.
+
+##### Non-Touch Devices
+
+- Clicking an episode title should immediately follow the link.
+
+#### Overall Score Precision
+
+Display overall ratings with four decimal places:
+
+```text
+8.1234
+```
+
+Do not round to two decimal places.
+
+#### Gradient Axis Styling
+
+Apply a gradual color progression to:
+
+- y-axis tick labels,
+- y-axis guide lines.
+
+The progression should remain readable in both light and dark modes.
+
+#### Rating Count Visualization
+
+For points belonging to the overall-rating series:
+
+- Use point area (not radius) to represent the episode's rating count.
+- Larger rating counts should produce larger points.
+- The scaling function does not need to be linear.
+
+Requirements:
+
+- Clamp the size to a reasonable hardcoded maximum.
+- Prevent large points from overlapping nearby points excessively.
+- Prevent large points from touching or obscuring adjacent series elements.
+
+Episodes without a rating count should use the minimum point size.
+
+#### Rating Count Legend
+
+Add a legend explaining the meaning of overall-rating point size.
+
+Placement:
+
+- Above the `10.0` y-axis tick.
+- On the right side of the chart.
+
+The legend should:
+
+- Show multiple example point sizes.
+- Indicate that point area represents rating count.
+- Remain visible and readable at all zoom levels.
+- Not overlap chart content.
+
+## `0.100.3` @ 2
+
+This is a follow-up to “`0.100.3` @ 1”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
+
+### Bugs to Fix
+
+#### Episode Title Labels Missing
+
+The vertical episode title labels are no longer rendered.
+
+Restore the labels and ensure they remain visible across:
+
+- initial render,
+- zooming,
+- panning,
+- theme changes.
+
+#### Legend Positioning
+
+The rating-count legend is currently positioned between the `9.0` and `10.0`
+y-axis ticks.
+
+This is incorrect.
+
+Requirements:
+
+- Reserve additional vertical space above the plotting area.
+- Keep the `10.0` tick at the top of the plotting area.
+- Render the legend above the `10.0` tick.
+- Ensure the legend does not overlap:
+
+  - the plot area,
+  - axis labels,
+  - axis guide lines,
+  - episode labels.
+
+#### Legend Spacing
+
+The example points in the rating-count legend are too close together.
+
+Increase spacing so that:
+
+- adjacent example points do not visually touch,
+- labels associated with different example points do not touch,
+- the legend remains readable at all supported chart widths.
+
+### Additional Requirements
+
+#### Legend Scaling
+
+The largest example point shown in the rating-count legend must represent the
+maximum rating count among all episodes in the current subject.
+
+Requirements:
+
+- Compute the maximum using the currently loaded subject data.
+- Use the same sizing function as the actual chart points.
+- The largest legend point must match the visual size that would be used for an
+  episode with that maximum rating count.
+- The displayed count value for that legend entry must be the actual maximum
+  rating count.
+
+The legend and chart must therefore remain synchronized whenever the underlying
+rating-count distribution changes.
+
+## `0.100.3` @ 3
+
+This is a follow-up to “`0.100.3` @ 2”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `XXX`
+
+### Bugs to Fix
+
+#### Trackpad Gesture Direction
+
+The horizontal navigation direction for trackpad gestures is currently reversed.
+
+Requirements:
+
+- Follow the platform's native scrolling direction.
+- Ensure Apple Magic Trackpad gestures behave consistently with other
+  horizontally scrollable content in macOS.
+
+#### Touch Interaction with Episode Title Links
+
+On Android Chrome, tapping an episode title immediately follows the link.
+
+This is incorrect.
+
+Requirements:
+
+- On touch devices, the first tap must only select the episode.
+- The first tap must never navigate, regardless of whether the tap occurs on the
+  title, guide line, point, or any other episode-associated element.
+- Navigation may occur only when the already-selected episode title is tapped
+  again.
+- Verify behavior specifically on Android Chrome.
+
+#### Link Hover Feedback
+
+On macOS Chrome, hovering over an episode title does not provide any indication
+that it is clickable.
+
+Requirements:
+
+- Episode titles must expose standard link affordances on pointer-based devices.
+- The cursor should indicate that the element is clickable.
+- Hover styling should make the interactive nature of the title visually
+  apparent.
+- The styling should remain consistent with both light and dark themes.
+
+### Additional Requirements
+
+#### Maximum Point Size
+
+The current maximum point size for rating-count visualization is too small.
+
+Increase the hardcoded maximum size substantially.
+
+Requirements:
+
+- The maximum point area should be at least 3× larger than the current maximum.
+- The legend must be updated automatically to reflect the new scale.
+- The largest point should remain visually distinguishable from medium-sized
+  points.
+- The size cap should still prevent excessive overlap with nearby chart
+  elements.
