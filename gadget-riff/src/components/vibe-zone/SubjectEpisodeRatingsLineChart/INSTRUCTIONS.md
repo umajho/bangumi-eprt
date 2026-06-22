@@ -116,7 +116,7 @@ The hover cursor must snap only to these episode positions.
 This is a follow-up to “`0.100.2` @ 1”.
 
 - Instruction polisher: `GPT-5.5`
-- Executor: `XXX`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
 
 ### Additional Requirements
 
@@ -205,3 +205,103 @@ Symptoms:
   1000 episodes. (Chrome shows “Page Unresponsive” and offers to kill the tab.)
 
 Optimize the implementation.
+
+## `0.100.3` @ 1
+
+This is a follow-up to “`0.100.2` @ 2”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `XXX`
+
+### Bugs to Fix
+
+#### Touch Dragging
+
+Horizontal dragging/panning does not work on touch devices.
+
+Fix touch interaction so that users can drag horizontally to navigate the chart.
+
+### Additional Requirements
+
+#### Trackpad Navigation
+
+Support horizontal navigation using touchpad / trackpad gestures, including:
+
+- Apple Magic Trackpad gestures.
+- Standard two-finger horizontal scrolling gestures.
+- Equivalent gestures on other platforms.
+
+The chart should respond naturally to platform-native scrolling behavior.
+
+#### Episode Title Links
+
+Episode titles should link to the corresponding episode page:
+
+```text
+/ep/{episodeId}
+```
+
+Interaction requirements:
+
+##### Touch Devices
+
+- The first tap anywhere on the chart selects the nearest episode.
+- The first tap on an episode title must also only select that episode.
+- If that episode is already selected, a subsequent tap on its title should
+  follow the link.
+- Tapping a different title should select that episode instead of navigating.
+
+##### Non-Touch Devices
+
+- Clicking an episode title should immediately follow the link.
+
+#### Overall Score Precision
+
+Display overall ratings with four decimal places:
+
+```text
+8.1234
+```
+
+Do not round to two decimal places.
+
+#### Gradient Axis Styling
+
+Apply a gradual color progression to:
+
+- y-axis tick labels,
+- y-axis guide lines.
+
+The progression should remain readable in both light and dark modes.
+
+#### Rating Count Visualization
+
+For points belonging to the overall-rating series:
+
+- Use point area (not radius) to represent the episode's rating count.
+- Larger rating counts should produce larger points.
+- The scaling function does not need to be linear.
+
+Requirements:
+
+- Clamp the size to a reasonable hardcoded maximum.
+- Prevent large points from overlapping nearby points excessively.
+- Prevent large points from touching or obscuring adjacent series elements.
+
+Episodes without a rating count should use the minimum point size.
+
+#### Rating Count Legend
+
+Add a legend explaining the meaning of overall-rating point size.
+
+Placement:
+
+- Above the `10.0` y-axis tick.
+- On the right side of the chart.
+
+The legend should:
+
+- Show multiple example point sizes.
+- Indicate that point area represents rating count.
+- Remain visible and readable at all zoom levels.
+- Not overlap chart content.

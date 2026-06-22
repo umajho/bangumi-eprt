@@ -38,6 +38,35 @@ const MAX_ZOOM = 64;
 const MIN_PIXELS_PER_TICK = 56; // x 轴日期刻度最小间距
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// overall 点尺寸：以面积表示评分人数
+const POINT_MIN_RADIUS = 2.5;
+const POINT_MAX_RADIUS = 7; // 硬编码最大半径
+// 面积缩放：使用平方根关系（面积 ∝ 半径²），以对数压缩避免极端值
+function overallPointRadius(votes: number): number {
+  if (votes <= 0) return POINT_MIN_RADIUS;
+  // 对数缩放：votes=1 → 接近最小，votes 越大越接近最大
+  const t = Math.log10(votes + 1) / Math.log10(1000 + 1); // 0..1（1000 人封顶）
+  const clamped = Math.min(1, Math.max(0, t));
+  const r = POINT_MIN_RADIUS +
+    (POINT_MAX_RADIUS - POINT_MIN_RADIUS) * clamped;
+  return Math.min(POINT_MAX_RADIUS, r);
+}
+
+// y 轴渐变色：从底部（冷色）到顶部（暖色），light/dark 各一套
+function yGradientColors(dark: boolean): string[] {
+  // 11 个刻度（0..10），从低到高
+  if (dark) {
+    return [
+      "#5b7fff", "#5f86f6", "#6a8dec", "#7994de", "#8b9bcc",
+      "#9da3b8", "#aeaba6", "#bfb294", "#d0ba82", "#e1c170", "#f2c95e",
+    ];
+  }
+  return [
+    "#3f51b5", "#4556ab", "#51619b", "#616f86", "#757d6f",
+    "#8a8b58", "#a09943", "#b7a72f", "#cfb51c", "#e7c30a", "#ffd400",
+  ];
+}
+
 function parseDate(s: `${number}-${number}-${number}`): number {
   const [y, m, d] = s.split("-").map(Number);
   return Date.UTC(y, m - 1, d);
@@ -109,7 +138,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   const [zoom, setZoom] = createSignal(1);
   const [panOffset, setPanOffset] = createSignal(0); // 时间偏移（毫秒）
   const [hoverIndex, setHoverIndex] = createSignal<number | null>(null);
+  const [selectedIndex, setSelectedIndex] = createSignal<number | null>(null);
   const [dark, setDark] = createSignal(isDarkMode());
+
+  // 触摸设备检测（用于区分 tap/click 交互模式）
+  const isTouchDevice = "ontouchstart" in window ||
+    (navigator.maxTouchPoints ?? 0) > 0;
 
   let containerRef: HTMLDivElement | null = null;
   let resizeObserver: ResizeObserver | null = null;
@@ -267,76 +301,121 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     return indices;
   });
 
-  // 拖动平移
+  // 拖动平移（鼠标 / 单指触摸）
   let dragging = false;
   let dragStartX = 0;
   let dragStartPan = 0;
+  let dragMoved = false; // 是否产生过位移（用于区分 tap 与 drag）
 
-  const onPointerDown = (ev: PointerEvent) => {
-    if (ev.pointerType === "touch") return;
+  const startDrag = (clientX: number) => {
     dragging = true;
-    dragStartX = ev.clientX;
+    dragMoved = false;
+    dragStartX = clientX;
     dragStartPan = panOffset();
-    (ev.target as Element).setPointerCapture?.(ev.pointerId);
   };
 
-  const onPointerMove = (ev: PointerEvent) => {
-    if (!dragging) return;
-    const dx = ev.clientX - dragStartX;
+  const moveDrag = (clientX: number) => {
+    if (!dragging) return false;
+    const dx = clientX - dragStartX;
+    if (Math.abs(dx) > 3) dragMoved = true;
     const v = viewDomain();
     const timeDelta = -(dx / (innerWidth() || 1)) * v.visibleSpan;
     const newPan = dragStartPan + timeDelta;
     setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
+    return dragMoved;
+  };
+
+  const endDrag = () => {
+    dragging = false;
+  };
+
+  const onPointerDown = (ev: PointerEvent) => {
+    if (ev.pointerType === "touch") return; // 触摸由 touch 处理器处理
+    startDrag(ev.clientX);
+    (ev.target as Element).setPointerCapture?.(ev.pointerId);
+  };
+
+  const onPointerMove = (ev: PointerEvent) => {
+    if (ev.pointerType === "touch") return;
+    if (dragging) moveDrag(ev.clientX);
+    onHoverMove(ev);
   };
 
   const onPointerUp = (ev: PointerEvent) => {
-    dragging = false;
+    if (ev.pointerType === "touch") return;
+    endDrag();
     (ev.target as Element).releasePointerCapture?.(ev.pointerId);
   };
 
-  // 滚轮缩放（以鼠标位置为锚点）
+  // 滚轮 / 触摸板：deltaX 平移、ctrl+deltaY 缩放、普通 deltaY 平移
   const onWheel = (ev: WheelEvent) => {
     ev.preventDefault();
     if (!containerRef) return;
-    const rect = containerRef.getBoundingClientRect();
-    const mouseX = ev.clientX - rect.left;
-    const innerX = Math.min(
-      Math.max(0, mouseX - PADDING_LEFT),
-      innerWidth(),
-    );
-    const ratio = innerWidth() > 0 ? innerX / innerWidth() : 0;
 
-    const oldZoom = zoom();
-    const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-    const newZoom = Math.min(Math.max(MIN_ZOOM, oldZoom * factor), MAX_ZOOM);
-    if (newZoom === oldZoom) return;
+    // 触摸板双指捏合缩放（ctrlKey）
+    if (ev.ctrlKey || ev.metaKey) {
+      const rect = containerRef.getBoundingClientRect();
+      const mouseX = ev.clientX - rect.left;
+      const innerX = Math.min(
+        Math.max(0, mouseX - PADDING_LEFT),
+        innerWidth(),
+      );
+      const ratio = innerWidth() > 0 ? innerX / innerWidth() : 0;
 
-    const dom = xDomain();
-    const span = dom.max - dom.min || 1;
-    const oldVisible = span / oldZoom;
-    const oldPan = panOffset();
-    const anchorTime = dom.min + oldPan + ratio * oldVisible;
-    const newVisible = span / newZoom;
-    let newPan = anchorTime - dom.min - ratio * newVisible;
-    const maxPan = Math.max(0, span - newVisible);
-    newPan = Math.min(Math.max(0, newPan), maxPan);
+      const oldZoom = zoom();
+      const factor = ev.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const newZoom = Math.min(
+        Math.max(MIN_ZOOM, oldZoom * factor),
+        MAX_ZOOM,
+      );
+      if (newZoom === oldZoom) return;
 
-    setZoom(newZoom);
-    setPanOffset(newPan);
+      const dom = xDomain();
+      const span = dom.max - dom.min || 1;
+      const oldVisible = span / oldZoom;
+      const oldPan = panOffset();
+      const anchorTime = dom.min + oldPan + ratio * oldVisible;
+      const newVisible = span / newZoom;
+      let newPan = anchorTime - dom.min - ratio * newVisible;
+      const maxPan = Math.max(0, span - newVisible);
+      newPan = Math.min(Math.max(0, newPan), maxPan);
+      setZoom(newZoom);
+      setPanOffset(newPan);
+      return;
+    }
+
+    // 平移：优先 deltaX（触摸板水平手势），否则用 deltaY（垂直滚动也作水平平移）
+    const delta = ev.deltaX !== 0 ? ev.deltaX : ev.deltaY;
+    if (delta === 0) return;
+    const v = viewDomain();
+    // 像素 → 时间转换
+    const timeDelta = (delta / (innerWidth() || 1)) * v.visibleSpan;
+    const newPan = panOffset() - timeDelta;
+    setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
   };
 
-  // 双指捏合缩放
+  // 触摸交互：单指拖动平移 + tap 选择；双指捏合缩放
   const pointers = new Map<number, { x: number; y: number }>();
   let pinchStartDist = 0;
   let pinchStartZoom = 1;
   let pinchStartPan = 0;
   let pinchCenterRatio = 0;
+  // 单指拖动状态（与 pinch 互斥）
+  let touchDragPointerId: number | null = null;
 
   const onTouchPointerDown = (ev: PointerEvent) => {
     if (ev.pointerType !== "touch") return;
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     (ev.target as Element).setPointerCapture?.(ev.pointerId);
-    if (pointers.size === 2) {
+
+    if (pointers.size === 1) {
+      // 开始单指拖动
+      touchDragPointerId = ev.pointerId;
+      startDrag(ev.clientX);
+    } else if (pointers.size === 2) {
+      // 切换到双指缩放，取消单指拖动
+      touchDragPointerId = null;
+      endDrag();
       const pts = [...pointers.values()];
       pinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       pinchStartZoom = zoom();
@@ -353,6 +432,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     if (ev.pointerType !== "touch") return;
     if (!pointers.has(ev.pointerId)) return;
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
     if (pointers.size === 2 && pinchStartDist > 0) {
       const pts = [...pointers.values()];
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -372,14 +452,80 @@ export const SubjectEpisodeRatingsLineChart: Component<{
       newPan = Math.min(Math.max(0, newPan), maxPan);
       setZoom(newZoom);
       setPanOffset(newPan);
+    } else if (
+      pointers.size === 1 && touchDragPointerId === ev.pointerId
+    ) {
+      moveDrag(ev.clientX);
     }
   };
 
   const onTouchPointerUp = (ev: PointerEvent) => {
     if (ev.pointerType !== "touch") return;
+    const wasDragPointer = touchDragPointerId === ev.pointerId;
+    const hadMoved = dragMoved;
     pointers.delete(ev.pointerId);
     (ev.target as Element).releasePointerCapture?.(ev.pointerId);
+
     if (pointers.size < 2) pinchStartDist = 0;
+
+    if (wasDragPointer) {
+      endDrag();
+      touchDragPointerId = null;
+      // 未移动 → 视为 tap：选择最近的 episode
+      if (!hadMoved) {
+        handleTap(ev.clientX, ev.target as Element);
+      }
+    } else if (pointers.size === 1 && touchDragPointerId === null) {
+      // 从双指变单指：剩余手指接管拖动
+      const [remaining] = [...pointers.entries()];
+      if (remaining) {
+        touchDragPointerId = remaining[0];
+        startDrag(remaining[1].x);
+      }
+    }
+  };
+
+  // tap 处理：选择最近 episode；若点击标题且已选中则跳转
+  const handleTap = (clientX: number, target: Element) => {
+    if (!containerRef) return;
+    const rect = containerRef.getBoundingClientRect();
+    const mouseX = clientX - rect.left;
+    const eps = episodes();
+    if (eps.length === 0) return;
+
+    // 检查是否点中了 episode 标题链接
+    const titleEl = target.closest("[data-ep-link]") as
+      | SVGAElement
+      | null;
+    if (titleEl) {
+      const epId = Number(titleEl.dataset.epLinkId);
+      const idx = eps.findIndex((e) => e.episodeId as number === epId);
+      if (idx >= 0) {
+        if (selectedIndex() === idx) {
+          // 已选中 → 跳转
+          window.location.href = `/ep/${epId}`;
+          return;
+        }
+        // 未选中 → 仅选中
+        setSelectedIndex(idx);
+        setHoverIndex(idx);
+        return;
+      }
+    }
+
+    // 普通区域 tap：选择最近的 episode
+    let nearest = 0;
+    let nearestDist = Infinity;
+    for (let i = 0; i < eps.length; i++) {
+      const x = xScale(eps[i].timestamp);
+      const d = Math.abs(x - mouseX);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = i;
+      }
+    }
+    setSelectedIndex(nearest);
+    setHoverIndex(nearest);
   };
 
   // hover：吸附到最近的 episode（按 x 距离）
@@ -461,6 +607,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     };
   });
 
+  // y 轴渐变色（从低到高）
+  const yGradient = createMemo(() => yGradientColors(dark()));
+
   const width = () => Math.max(containerWidth(), 1);
 
   const tooltipData = createMemo(() => {
@@ -523,10 +672,11 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             fill={colors().bg}
           />
 
-          {/* 水平网格线 + y 轴刻度 */}
+          {/* 水平网格线 + y 轴刻度（渐变色） */}
           <Index each={yTicks}>
-            {(tick) => {
+            {(tick, idx) => {
               const y = () => yScale(tick());
+              const color = () => yGradient()[idx];
               return (
                 <g>
                   <line
@@ -534,8 +684,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     y1={y()}
                     x2={width() - PADDING_RIGHT}
                     y2={y()}
-                    stroke={colors().grid}
+                    stroke={color()}
                     stroke-width={tick() === 0 ? 1.5 : 0.5}
+                    opacity={tick() === 0 ? 1 : 0.55}
                   />
                   <text
                     x={PADDING_LEFT - 8}
@@ -543,7 +694,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     text-anchor="end"
                     dominant-baseline="middle"
                     font-size="11"
-                    fill={colors().text}
+                    fill={color()}
                   >
                     {tick().toFixed(1)}
                   </text>
@@ -600,11 +751,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             }}
           </Index>
 
-          {/* episode 引导线 + 竖排标题（仅可见项） */}
+          {/* episode 引导线 + 竖排标题链接（仅可见项） */}
           <Index each={visibleEpisodeIndices()}>
             {(i) => {
               const ep = () => episodes()[i()];
               const x = () => xScale(ep().timestamp);
+              const isSelected = () => selectedIndex() === i();
               return (
                 <g>
                   <line
@@ -617,18 +769,41 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     stroke-dasharray="2,3"
                   />
                   <Show when={ep().title}>
-                    <text
-                      x={x() + 4}
-                      y={CHART_HEIGHT - PADDING_BOTTOM - 4}
-                      transform={`rotate(-90, ${x() + 4}, ${
-                        CHART_HEIGHT - PADDING_BOTTOM - 4
-                      })`}
-                      text-anchor="start"
-                      font-size="10"
-                      fill={colors().guideText}
+                    <a
+                      href={`/ep/${ep().episodeId as number}`}
+                      data-ep-link=""
+                      data-ep-link-id={ep().episodeId as number}
+                      style={{
+                        cursor: "pointer",
+                        "text-decoration": isSelected() ? "underline" : "none",
+                      }}
+                      onClick={(ev) => {
+                        // 非触摸设备：点击标题立即跳转（默认行为）
+                        // 触摸设备：由 handleTap 处理选择/跳转
+                        if (isTouchDevice) {
+                          ev.preventDefault();
+                          handleTap(
+                            ev.clientX,
+                            ev.currentTarget as unknown as Element,
+                          );
+                        }
+                      }}
                     >
-                      {ep().title}
-                    </text>
+                      <text
+                        x={x() + 4}
+                        y={CHART_HEIGHT - PADDING_BOTTOM - 4}
+                        transform={`rotate(-90, ${x() + 4}, ${
+                          CHART_HEIGHT - PADDING_BOTTOM - 4
+                        })`}
+                        text-anchor="start"
+                        font-size="10"
+                        fill={isSelected()
+                          ? colors().overall
+                          : colors().guideText}
+                      >
+                        {ep().title}
+                      </text>
+                    </a>
                   </Show>
                 </g>
               );
@@ -660,14 +835,18 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             {(i) => {
               const ep = () => episodes()[i()];
               const x = () => xScale(ep().timestamp);
+              const overallR = () => overallPointRadius(ep().overallVotes);
               return (
                 <g>
                   <Show when={ep().overallRating !== null}>
                     <circle
                       cx={x()}
                       cy={yScale(ep().overallRating!)}
-                      r={2.5}
+                      r={overallR()}
                       fill={colors().overall}
+                      fill-opacity={0.85}
+                      stroke={colors().bg}
+                      stroke-width={0.5}
                     />
                   </Show>
                   <Show when={ep().myRating !== null}>
@@ -676,6 +855,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       cy={yScale(ep().myRating!)}
                       r={2.5}
                       fill={colors().my}
+                      stroke={colors().bg}
+                      stroke-width={0.5}
                     />
                   </Show>
                 </g>
@@ -700,8 +881,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   <circle
                     cx={td().x}
                     cy={yScale(td().e.overallRating!)}
-                    r={4}
+                    r={overallPointRadius(td().e.overallVotes)}
                     fill={colors().overall}
+                    fill-opacity={0.85}
                     stroke={colors().bg}
                     stroke-width={1.5}
                   />
@@ -719,6 +901,58 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               </g>
             )}
           </Show>
+
+          {/* 评分人数图例（右上角，10.0 刻度上方） */}
+          {(() => {
+            const legendX = width() - PADDING_RIGHT - 4;
+            const legendY = PADDING_TOP + 2;
+            const examples = [1, 50, 500, 1000];
+            return (
+              <g
+                style={{ "pointer-events": "none" }}
+                opacity={0.92}
+              >
+                <text
+                  x={legendX}
+                  y={legendY}
+                  text-anchor="end"
+                  font-size="9"
+                  fill={colors().text}
+                >
+                  点面积 = 评分人数
+                </text>
+                <Index each={examples}>
+                  {(n, idx) => {
+                    const r = () => overallPointRadius(n());
+                    const cx = () => legendX - 8 - idx * 16;
+                    const cy = () => legendY + 14;
+                    return (
+                      <g>
+                        <circle
+                          cx={cx()}
+                          cy={cy()}
+                          r={r()}
+                          fill={colors().overall}
+                          fill-opacity={0.85}
+                          stroke={colors().bg}
+                          stroke-width={0.5}
+                        />
+                        <text
+                          x={cx()}
+                          y={cy() + POINT_MAX_RADIUS + 9}
+                          text-anchor="middle"
+                          font-size="8"
+                          fill={colors().text}
+                        >
+                          {n()}
+                        </text>
+                      </g>
+                    );
+                  }}
+                </Index>
+              </g>
+            );
+          })()}
         </svg>
       </Show>
 
@@ -768,7 +1002,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       "vertical-align": "middle",
                     }}
                   />
-                  整体评分：{td().e.overallRating!.toFixed(2)}
+                  整体评分：{td().e.overallRating!.toFixed(4)}
                   <span style={{ opacity: 0.7 }}>
                     {" "}（{td().e.overallVotes} 人）
                   </span>
