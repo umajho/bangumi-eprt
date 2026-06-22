@@ -768,7 +768,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       "vertical-align": "middle",
                     }}
                   />
-                  总评：{td().e.overallRating!.toFixed(2)}
+                  整体评分：{td().e.overallRating!.toFixed(2)}
                   <span style={{ opacity: 0.7 }}>
                     {" "}（{td().e.overallVotes} 人）
                   </span>
@@ -788,7 +788,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       opacity: 0.4,
                     }}
                   />
-                  总评：暂无
+                  整体评分：暂无
                 </div>
               </Show>
               <Show when={td().e.myRating !== null}>
