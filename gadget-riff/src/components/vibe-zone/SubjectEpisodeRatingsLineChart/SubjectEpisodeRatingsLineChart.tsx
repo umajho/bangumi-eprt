@@ -2,7 +2,7 @@ import {
   type Component,
   createMemo,
   createSignal,
-  For,
+  Index,
   onCleanup,
   onMount,
   Show,
@@ -10,12 +10,15 @@ import {
 
 import type { Context } from "../../../context";
 import {
+  type EpisodeData,
   type EpisodeId,
   type EpisodeVotes,
+  type MyRating,
   scores,
+  type SubjectData,
   type SubjectId,
 } from "../../../definitions";
-import * as epDataHelpers from "../../../utils/episode-data-helpers";
+import type { SubjectDataResponse } from "../../../stores/temporary-global-stores/score-store";
 
 export interface DataPoint {
   episodeId: EpisodeId;
@@ -23,20 +26,29 @@ export interface DataPoint {
 }
 
 const CHART_HEIGHT = 360;
-const PADDING_LEFT = 44;
+const PADDING_LEFT = 52;
 const PADDING_RIGHT = 16;
 const PADDING_TOP = 16;
-const PADDING_BOTTOM = 28;
+const PADDING_BOTTOM = 40;
 const Y_MIN = 0;
 const Y_MAX = 10;
 const Y_TICK_STEP = 1;
 const MIN_ZOOM = 1; // 全部剧集
-const MAX_ZOOM = 32;
+const MAX_ZOOM = 64;
+const MIN_PIXELS_PER_TICK = 56; // x 轴日期刻度最小间距
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function parseDate(s: `${number}-${number}-${number}`): number {
   const [y, m, d] = s.split("-").map(Number);
-  // 使用 UTC 时间戳以避免时区偏移影响排序与定位
   return Date.UTC(y, m - 1, d);
+}
+
+function formatDateLabel(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function isDarkMode(): boolean {
@@ -75,6 +87,19 @@ interface EpisodeInfo {
   title: string | null;
 }
 
+// 选择合适的日期刻度间隔（天），使刻度间距不小于 MIN_PIXELS_PER_TICK
+function chooseTickIntervalDays(visibleSpanMs: number, innerW: number): number {
+  const minDays = Math.max(
+    1,
+    Math.ceil((visibleSpanMs / DAY_MS) / (innerW / MIN_PIXELS_PER_TICK)),
+  );
+  const niceSteps = [1, 2, 7, 14, 30, 60, 90, 180, 365, 730, 1095];
+  for (const s of niceSteps) {
+    if (s >= minDays) return s;
+  }
+  return Math.ceil(minDays / 365) * 365;
+}
+
 export const SubjectEpisodeRatingsLineChart: Component<{
   ctx: Context;
   subjectId: SubjectId;
@@ -82,34 +107,27 @@ export const SubjectEpisodeRatingsLineChart: Component<{
 }> = (props) => {
   const [containerWidth, setContainerWidth] = createSignal(0);
   const [zoom, setZoom] = createSignal(1);
-  const [panOffset, setPanOffset] = createSignal(0); // 像素偏移（向右为正）
+  const [panOffset, setPanOffset] = createSignal(0); // 时间偏移（毫秒）
   const [hoverIndex, setHoverIndex] = createSignal<number | null>(null);
   const [dark, setDark] = createSignal(isDarkMode());
 
   let containerRef: HTMLDivElement | null = null;
-
-  // 监听容器宽度变化
   let resizeObserver: ResizeObserver | null = null;
+  let mo: MutationObserver | null = null;
+
   const measure = () => {
-    if (containerRef) {
-      setContainerWidth(containerRef.clientWidth);
-    }
+    if (containerRef) setContainerWidth(containerRef.clientWidth);
   };
-  // 在 onCleanup 中清理
+
   onCleanup(() => {
     resizeObserver?.disconnect();
     mo?.disconnect();
   });
 
-  // 监听 data-theme 变化
-  let mo: MutationObserver | null = null;
-
-  // 初始化副作用：在 onMount 中执行，此时 ref 已绑定
   onMount(() => {
     measure();
     resizeObserver = new ResizeObserver(measure);
     if (containerRef) resizeObserver.observe(containerRef);
-
     mo = new MutationObserver(() => setDark(isDarkMode()));
     mo.observe(document.documentElement, {
       attributes: true,
@@ -117,43 +135,46 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     });
   });
 
-  // 为每个 episode 查询评分数据
-  const episodeDataAccessors = createMemo(() => {
-    return props.dataPoints.map((dp) => {
-      const resp = props.ctx.scoreStore.queryEpisodeDataTracked(
-        props.subjectId,
-        dp.episodeId,
-        { prefersFetchingCompleteSubjectVotes: true },
-      );
-      const data = epDataHelpers.createData(resp);
-      return { dp, data };
-    });
+  // 单次查询整个 subject 的评分数据（一次网络请求覆盖所有 episode）
+  const subjectDataResp: () => SubjectDataResponse = () =>
+    props.ctx.scoreStore.queryCompleteSubjectDataTracked(props.subjectId)();
+
+  const subjectData = createMemo<SubjectData | undefined>(() => {
+    const r = subjectDataResp();
+    if (r[0] !== "ok") return undefined;
+    return r[1];
   });
 
-  // 为每个 episode 异步加载标题
+  // 异步加载标题（按需，仅对可见 episode）
   const [titles, setTitles] = createSignal<Record<number, string>>({});
-  createMemo(() => {
-    for (const dp of props.dataPoints) {
-      const id = dp.episodeId as number;
-      if (titles()[id] === undefined) {
-        props.ctx.bgmClient.getEpisodeTitle(dp.episodeId).then((title) => {
-          setTitles((prev) => ({ ...prev, [id]: title }));
-        });
-      }
-    }
-  });
+  const titleRequested = new Set<number>();
+  const ensureTitle = (episodeId: EpisodeId) => {
+    const id = episodeId as number;
+    if (titleRequested.has(id)) return;
+    titleRequested.add(id);
+    props.ctx.bgmClient.getEpisodeTitle(episodeId).then((title) => {
+      setTitles((prev) => ({ ...prev, [id]: title }));
+    });
+  };
 
-  // 合并后的 episode 信息（按日期排序）
+  // 合并 episode 信息：严格保持 props.dataPoints 的顺序（权威排序）
   const episodes = createMemo<EpisodeInfo[]>(() => {
-    const accessors = episodeDataAccessors();
+    const sd = subjectData();
     const t = titles();
-    return accessors.map(({ dp, data }) => {
-      const d = data();
-      const votes = d?.votes ?? {};
+    const result: EpisodeInfo[] = [];
+    for (const dp of props.dataPoints) {
+      const epResp = sd?.episodes[dp.episodeId];
+      let votes: EpisodeVotes = {};
+      let myRating: MyRating | undefined;
+      if (epResp && epResp[0] === "ok") {
+        const ed: EpisodeData = epResp[1];
+        votes = ed.votes ?? {};
+        myRating = ed.myRating;
+      }
       const overall = averageScore(votes);
       const tv = totalVotes(votes);
-      const my = d?.myRating?.score ?? null;
-      return {
+      const my = myRating?.score ?? null;
+      result.push({
         episodeId: dp.episodeId,
         date: dp.date,
         timestamp: parseDate(dp.date),
@@ -161,37 +182,39 @@ export const SubjectEpisodeRatingsLineChart: Component<{
         overallVotes: tv,
         myRating: my === null ? null : my,
         title: t[dp.episodeId as number] ?? null,
-      };
-    }).sort((a, b) => a.timestamp - b.timestamp);
+      });
+    }
+    return result;
   });
 
   const innerWidth = () =>
     Math.max(0, containerWidth() - PADDING_LEFT - PADDING_RIGHT);
   const innerHeight = () => CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
-  // x 轴域（时间戳范围）
+  // x 轴域（时间戳范围），基于 dataPoints 中的日期
   const xDomain = createMemo(() => {
     const eps = episodes();
     if (eps.length === 0) return { min: 0, max: 1 };
-    if (eps.length === 1) {
-      const t = eps[0].timestamp;
-      return { min: t - 1, max: t + 1 };
+    let min = Infinity;
+    let max = -Infinity;
+    for (const e of eps) {
+      if (e.timestamp < min) min = e.timestamp;
+      if (e.timestamp > max) max = e.timestamp;
     }
-    return { min: eps[0].timestamp, max: eps[eps.length - 1].timestamp };
+    if (min === max) return { min: min - DAY_MS, max: max + DAY_MS };
+    return { min, max };
   });
 
-  // 缩放后的可视时间范围（以 panOffset/zoom 控制）
-  // zoom=1 时显示全部；zoom>1 时按比例缩小可见时间范围
+  // 缩放后的可视时间范围
   const viewDomain = createMemo(() => {
     const dom = xDomain();
-    const span = dom.max - dom.min;
+    const span = dom.max - dom.min || 1;
     const visibleSpan = span / zoom();
-    // panOffset 取值范围 [0, span - visibleSpan]
     const maxPan = Math.max(0, span - visibleSpan);
     const pan = Math.min(Math.max(0, panOffset()), maxPan);
     const min = dom.min + pan;
     const max = min + visibleSpan;
-    return { min, max, pan, maxPan };
+    return { min, max, pan, maxPan, span, visibleSpan };
   });
 
   const xScale = (timestamp: number): number => {
@@ -206,11 +229,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     return PADDING_TOP + (1 - ratio) * innerHeight();
   };
 
-  // 生成折线 path，遇到 null 值断开
-  const buildLinePath = (
-    eps: EpisodeInfo[],
-    getValue: (e: EpisodeInfo) => number | null,
-  ): string => {
+  // 生成折线 path：按 dataPoints 顺序连接相邻有效点，遇 null 断开
+  const buildPath = (getValue: (e: EpisodeInfo) => number | null) => {
+    const eps = episodes();
     let path = "";
     let started = false;
     for (const e of eps) {
@@ -227,13 +248,32 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     return path.trim();
   };
 
+  const overallPath = createMemo(() => buildPath((e) => e.overallRating));
+  const myPath = createMemo(() => buildPath((e) => e.myRating));
+
+  // 可见 episode 索引列表（视口剔除），同时按需加载标题
+  const visibleEpisodeIndices = createMemo(() => {
+    const eps = episodes();
+    const left = PADDING_LEFT - 20;
+    const right = containerWidth() - PADDING_RIGHT + 20;
+    const indices: number[] = [];
+    for (let i = 0; i < eps.length; i++) {
+      const x = xScale(eps[i].timestamp);
+      if (x >= left && x <= right) {
+        indices.push(i);
+        if (eps[i].title === null) ensureTitle(eps[i].episodeId);
+      }
+    }
+    return indices;
+  });
+
   // 拖动平移
   let dragging = false;
   let dragStartX = 0;
   let dragStartPan = 0;
 
   const onPointerDown = (ev: PointerEvent) => {
-    if (ev.pointerType === "touch") return; // 触摸由 pinch 处理
+    if (ev.pointerType === "touch") return;
     dragging = true;
     dragStartX = ev.clientX;
     dragStartPan = panOffset();
@@ -241,17 +281,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   };
 
   const onPointerMove = (ev: PointerEvent) => {
-    if (dragging) {
-      const dx = ev.clientX - dragStartX;
-      const dom = xDomain();
-      const span = dom.max - dom.min || 1;
-      // 将像素位移转换为时间位移
-      const visibleSpan = span / zoom();
-      const timeDelta = -(dx / innerWidth()) * visibleSpan;
-      const newPan = dragStartPan + timeDelta;
-      const maxPan = Math.max(0, span - visibleSpan);
-      setPanOffset(Math.min(Math.max(0, newPan), maxPan));
-    }
+    if (!dragging) return;
+    const dx = ev.clientX - dragStartX;
+    const v = viewDomain();
+    const timeDelta = -(dx / (innerWidth() || 1)) * v.visibleSpan;
+    const newPan = dragStartPan + timeDelta;
+    setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
   };
 
   const onPointerUp = (ev: PointerEvent) => {
@@ -259,13 +294,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     (ev.target as Element).releasePointerCapture?.(ev.pointerId);
   };
 
-  // 滚轮缩放
+  // 滚轮缩放（以鼠标位置为锚点）
   const onWheel = (ev: WheelEvent) => {
     ev.preventDefault();
     if (!containerRef) return;
     const rect = containerRef.getBoundingClientRect();
     const mouseX = ev.clientX - rect.left;
-    // 鼠标在内部坐标系的相对位置 [0,1]
     const innerX = Math.min(
       Math.max(0, mouseX - PADDING_LEFT),
       innerWidth(),
@@ -274,19 +308,14 @@ export const SubjectEpisodeRatingsLineChart: Component<{
 
     const oldZoom = zoom();
     const factor = ev.deltaY < 0 ? 1.15 : 1 / 1.15;
-    const newZoom = Math.min(
-      Math.max(MIN_ZOOM, oldZoom * factor),
-      MAX_ZOOM,
-    );
+    const newZoom = Math.min(Math.max(MIN_ZOOM, oldZoom * factor), MAX_ZOOM);
     if (newZoom === oldZoom) return;
 
-    // 以鼠标位置为锚点缩放
     const dom = xDomain();
     const span = dom.max - dom.min || 1;
     const oldVisible = span / oldZoom;
     const oldPan = panOffset();
     const anchorTime = dom.min + oldPan + ratio * oldVisible;
-
     const newVisible = span / newZoom;
     let newPan = anchorTime - dom.min - ratio * newVisible;
     const maxPan = Math.max(0, span - newVisible);
@@ -315,10 +344,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
       if (!containerRef) return;
       const rect = containerRef.getBoundingClientRect();
       const cx = (pts[0].x + pts[1].x) / 2 - rect.left;
-      const innerX = Math.min(
-        Math.max(0, cx - PADDING_LEFT),
-        innerWidth(),
-      );
+      const innerX = Math.min(Math.max(0, cx - PADDING_LEFT), innerWidth());
       pinchCenterRatio = innerWidth() > 0 ? innerX / innerWidth() : 0;
     }
   };
@@ -353,14 +379,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     if (ev.pointerType !== "touch") return;
     pointers.delete(ev.pointerId);
     (ev.target as Element).releasePointerCapture?.(ev.pointerId);
-    if (pointers.size < 2) {
-      pinchStartDist = 0;
-    }
+    if (pointers.size < 2) pinchStartDist = 0;
   };
 
-  // hover 处理：吸附到最近的 episode
+  // hover：吸附到最近的 episode（按 x 距离）
   const onHoverMove = (ev: MouseEvent) => {
-    if (pointers.size >= 2) return; // 缩放中不处理 hover
+    if (pointers.size >= 2) return;
     if (!containerRef) return;
     const rect = containerRef.getBoundingClientRect();
     const mouseX = ev.clientX - rect.left;
@@ -382,14 +406,27 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     setHoverIndex(nearest);
   };
 
-  const onHoverLeave = () => {
-    setHoverIndex(null);
-  };
+  const onHoverLeave = () => setHoverIndex(null);
 
   const yTicks = Array.from(
     { length: (Y_MAX - Y_MIN) / Y_TICK_STEP + 1 },
     (_, i) => Y_MIN + i * Y_TICK_STEP,
   );
+
+  // x 轴日期刻度
+  const xTicks = createMemo(() => {
+    const v = viewDomain();
+    const innerW = innerWidth();
+    if (innerW <= 0) return [];
+    const intervalDays = chooseTickIntervalDays(v.visibleSpan, innerW);
+    const intervalMs = intervalDays * DAY_MS;
+    const startMs = Math.ceil(v.min / intervalMs) * intervalMs;
+    const ticks: { ms: number; label: string }[] = [];
+    for (let ms = startMs; ms <= v.max; ms += intervalMs) {
+      ticks.push({ ms, label: formatDateLabel(ms) });
+    }
+    return ticks;
+  });
 
   const colors = createMemo(() => {
     if (dark()) {
@@ -424,7 +461,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     };
   });
 
-  const width = () => Math.max(containerWidth(), 320);
+  const width = () => Math.max(containerWidth(), 1);
 
   const tooltipData = createMemo(() => {
     const idx = hoverIndex();
@@ -435,6 +472,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     const x = xScale(e.timestamp);
     return { e, x };
   });
+
+  const ready = () => containerWidth() > 0;
 
   return (
     <div
@@ -447,224 +486,259 @@ export const SubjectEpisodeRatingsLineChart: Component<{
         "touch-action": "none",
       }}
     >
-      <svg
-        width={width()}
-        height={CHART_HEIGHT}
-        style={{ display: "block", "touch-action": "none" }}
-        onPointerDown={(ev) => {
-          if (ev.pointerType === "touch") {
-            onTouchPointerDown(ev);
-          } else {
-            onPointerDown(ev);
-          }
-        }}
-        onPointerMove={(ev) => {
-          if (ev.pointerType === "touch") {
-            onTouchPointerMove(ev);
-          } else {
-            onPointerMove(ev);
-            onHoverMove(ev);
-          }
-        }}
-        onPointerUp={(ev) => {
-          if (ev.pointerType === "touch") {
-            onTouchPointerUp(ev);
-          } else {
-            onPointerUp(ev);
-          }
-        }}
-        onPointerLeave={onHoverLeave}
-        onMouseMove={onHoverMove}
-        onMouseLeave={onHoverLeave}
-        onWheel={onWheel}
+      <Show
+        when={ready()}
+        fallback={<div style={{ height: `${CHART_HEIGHT}px` }} />}
       >
-        {/* 背景 */}
-        <rect
-          x={0}
-          y={0}
+        <svg
           width={width()}
           height={CHART_HEIGHT}
-          fill={colors().bg}
-        />
+          style={{ display: "block", "touch-action": "none" }}
+          onPointerDown={(ev) => {
+            if (ev.pointerType === "touch") onTouchPointerDown(ev);
+            else onPointerDown(ev);
+          }}
+          onPointerMove={(ev) => {
+            if (ev.pointerType === "touch") onTouchPointerMove(ev);
+            else {
+              onPointerMove(ev);
+              onHoverMove(ev);
+            }
+          }}
+          onPointerUp={(ev) => {
+            if (ev.pointerType === "touch") onTouchPointerUp(ev);
+            else onPointerUp(ev);
+          }}
+          onPointerLeave={onHoverLeave}
+          onMouseMove={onHoverMove}
+          onMouseLeave={onHoverLeave}
+          onWheel={onWheel}
+        >
+          {/* 背景 */}
+          <rect
+            x={0}
+            y={0}
+            width={width()}
+            height={CHART_HEIGHT}
+            fill={colors().bg}
+          />
 
-        {/* 水平网格线 + y 轴刻度 */}
-        <For each={yTicks}>
-          {(tick) => {
-            const y = yScale(tick);
-            return (
+          {/* 水平网格线 + y 轴刻度 */}
+          <Index each={yTicks}>
+            {(tick) => {
+              const y = () => yScale(tick());
+              return (
+                <g>
+                  <line
+                    x1={PADDING_LEFT}
+                    y1={y()}
+                    x2={width() - PADDING_RIGHT}
+                    y2={y()}
+                    stroke={colors().grid}
+                    stroke-width={tick() === 0 ? 1.5 : 0.5}
+                  />
+                  <text
+                    x={PADDING_LEFT - 8}
+                    y={y()}
+                    text-anchor="end"
+                    dominant-baseline="middle"
+                    font-size="11"
+                    fill={colors().text}
+                  >
+                    {tick().toFixed(1)}
+                  </text>
+                </g>
+              );
+            }}
+          </Index>
+
+          {/* y 轴线 */}
+          <line
+            x1={PADDING_LEFT}
+            y1={PADDING_TOP}
+            x2={PADDING_LEFT}
+            y2={CHART_HEIGHT - PADDING_BOTTOM}
+            stroke={colors().axis}
+            stroke-width={1}
+          />
+
+          {/* x 轴线 */}
+          <line
+            x1={PADDING_LEFT}
+            y1={CHART_HEIGHT - PADDING_BOTTOM}
+            x2={width() - PADDING_RIGHT}
+            y2={CHART_HEIGHT - PADDING_BOTTOM}
+            stroke={colors().axis}
+            stroke-width={1}
+          />
+
+          {/* x 轴日期刻度 */}
+          <Index each={xTicks()}>
+            {(tick) => {
+              const x = () => xScale(tick().ms);
+              return (
+                <g>
+                  <line
+                    x1={x()}
+                    y1={CHART_HEIGHT - PADDING_BOTTOM}
+                    x2={x()}
+                    y2={CHART_HEIGHT - PADDING_BOTTOM + 4}
+                    stroke={colors().axis}
+                    stroke-width={1}
+                  />
+                  <text
+                    x={x()}
+                    y={CHART_HEIGHT - PADDING_BOTTOM + 16}
+                    text-anchor="middle"
+                    font-size="10"
+                    fill={colors().text}
+                  >
+                    {tick().label}
+                  </text>
+                </g>
+              );
+            }}
+          </Index>
+
+          {/* episode 引导线 + 竖排标题（仅可见项） */}
+          <Index each={visibleEpisodeIndices()}>
+            {(i) => {
+              const ep = () => episodes()[i()];
+              const x = () => xScale(ep().timestamp);
+              return (
+                <g>
+                  <line
+                    x1={x()}
+                    y1={PADDING_TOP}
+                    x2={x()}
+                    y2={CHART_HEIGHT - PADDING_BOTTOM}
+                    stroke={colors().guide}
+                    stroke-width={1}
+                    stroke-dasharray="2,3"
+                  />
+                  <Show when={ep().title}>
+                    <text
+                      x={x() + 4}
+                      y={CHART_HEIGHT - PADDING_BOTTOM - 4}
+                      transform={`rotate(-90, ${x() + 4}, ${
+                        CHART_HEIGHT - PADDING_BOTTOM - 4
+                      })`}
+                      text-anchor="start"
+                      font-size="10"
+                      fill={colors().guideText}
+                    >
+                      {ep().title}
+                    </text>
+                  </Show>
+                </g>
+              );
+            }}
+          </Index>
+
+          {/* Overall 折线 */}
+          <path
+            d={overallPath()}
+            fill="none"
+            stroke={colors().overall}
+            stroke-width={2}
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+
+          {/* My 折线 */}
+          <path
+            d={myPath()}
+            fill="none"
+            stroke={colors().my}
+            stroke-width={2}
+            stroke-linejoin="round"
+            stroke-linecap="round"
+          />
+
+          {/* 数据点标记（仅可见项） */}
+          <Index each={visibleEpisodeIndices()}>
+            {(i) => {
+              const ep = () => episodes()[i()];
+              const x = () => xScale(ep().timestamp);
+              return (
+                <g>
+                  <Show when={ep().overallRating !== null}>
+                    <circle
+                      cx={x()}
+                      cy={yScale(ep().overallRating!)}
+                      r={2.5}
+                      fill={colors().overall}
+                    />
+                  </Show>
+                  <Show when={ep().myRating !== null}>
+                    <circle
+                      cx={x()}
+                      cy={yScale(ep().myRating!)}
+                      r={2.5}
+                      fill={colors().my}
+                    />
+                  </Show>
+                </g>
+              );
+            }}
+          </Index>
+
+          {/* hover 游标线 */}
+          <Show when={tooltipData()}>
+            {(td) => (
               <g>
                 <line
-                  x1={PADDING_LEFT}
-                  y1={y}
-                  x2={width() - PADDING_RIGHT}
-                  y2={y}
-                  stroke={colors().grid}
-                  stroke-width={tick === 0 ? 1.5 : 0.5}
-                />
-                <text
-                  x={PADDING_LEFT - 8}
-                  y={y}
-                  text-anchor="end"
-                  dominant-baseline="middle"
-                  font-size="11"
-                  fill={colors().text}
-                >
-                  {tick.toFixed(1)}
-                </text>
-              </g>
-            );
-          }}
-        </For>
-
-        {/* y 轴线 */}
-        <line
-          x1={PADDING_LEFT}
-          y1={PADDING_TOP}
-          x2={PADDING_LEFT}
-          y2={CHART_HEIGHT - PADDING_BOTTOM}
-          stroke={colors().axis}
-          stroke-width={1}
-        />
-
-        {/* episode 引导线 + 竖排标题 */}
-        <For each={episodes()}>
-          {(e) => {
-            const x = xScale(e.timestamp);
-            const inView = x >= PADDING_LEFT - 50 &&
-              x <= width() - PADDING_RIGHT + 50;
-            return (
-              <Show when={inView}>
-                <line
-                  x1={x}
+                  x1={td().x}
                   y1={PADDING_TOP}
-                  x2={x}
+                  x2={td().x}
                   y2={CHART_HEIGHT - PADDING_BOTTOM}
-                  stroke={colors().guide}
+                  stroke={colors().cursor}
                   stroke-width={1}
-                  stroke-dasharray="2,3"
+                  stroke-dasharray="4,2"
                 />
-                <Show when={e.title}>
-                  <text
-                    x={x}
-                    y={CHART_HEIGHT - PADDING_BOTTOM + 6}
-                    transform={`rotate(-90, ${x}, ${
-                      CHART_HEIGHT - PADDING_BOTTOM + 6
-                    })`}
-                    text-anchor="end"
-                    font-size="10"
-                    fill={colors().guideText}
-                  >
-                    {e.title}
-                  </text>
-                </Show>
-              </Show>
-            );
-          }}
-        </For>
-
-        {/* Overall 折线 */}
-        <path
-          d={buildLinePath(episodes(), (e) => e.overallRating)}
-          fill="none"
-          stroke={colors().overall}
-          stroke-width={2}
-          stroke-linejoin="round"
-          stroke-linecap="round"
-        />
-
-        {/* My 折线 */}
-        <path
-          d={buildLinePath(episodes(), (e) => e.myRating)}
-          fill="none"
-          stroke={colors().my}
-          stroke-width={2}
-          stroke-linejoin="round"
-          stroke-linecap="round"
-        />
-
-        {/* 数据点标记 */}
-        <For each={episodes()}>
-          {(e) => {
-            const x = xScale(e.timestamp);
-            const inView = x >= PADDING_LEFT - 10 &&
-              x <= width() - PADDING_RIGHT + 10;
-            return (
-              <Show when={inView}>
-                <Show when={e.overallRating !== null}>
+                <Show when={td().e.overallRating !== null}>
                   <circle
-                    cx={x}
-                    cy={yScale(e.overallRating!)}
-                    r={2.5}
+                    cx={td().x}
+                    cy={yScale(td().e.overallRating!)}
+                    r={4}
                     fill={colors().overall}
+                    stroke={colors().bg}
+                    stroke-width={1.5}
                   />
                 </Show>
-                <Show when={e.myRating !== null}>
+                <Show when={td().e.myRating !== null}>
                   <circle
-                    cx={x}
-                    cy={yScale(e.myRating!)}
-                    r={2.5}
+                    cx={td().x}
+                    cy={yScale(td().e.myRating!)}
+                    r={4}
                     fill={colors().my}
+                    stroke={colors().bg}
+                    stroke-width={1.5}
                   />
                 </Show>
-              </Show>
-            );
-          }}
-        </For>
+              </g>
+            )}
+          </Show>
+        </svg>
+      </Show>
 
-        {/* hover 游标线 */}
-        <Show when={tooltipData()}>
-          {(td) => (
-            <g>
-              <line
-                x1={td().x}
-                y1={PADDING_TOP}
-                x2={td().x}
-                y2={CHART_HEIGHT - PADDING_BOTTOM}
-                stroke={colors().cursor}
-                stroke-width={1}
-                stroke-dasharray="4,2"
-              />
-              <Show when={td().e.overallRating !== null}>
-                <circle
-                  cx={td().x}
-                  cy={yScale(td().e.overallRating!)}
-                  r={4}
-                  fill={colors().overall}
-                  stroke={colors().bg}
-                  stroke-width={1.5}
-                />
-              </Show>
-              <Show when={td().e.myRating !== null}>
-                <circle
-                  cx={td().x}
-                  cy={yScale(td().e.myRating!)}
-                  r={4}
-                  fill={colors().my}
-                  stroke={colors().bg}
-                  stroke-width={1.5}
-                />
-              </Show>
-            </g>
-          )}
-        </Show>
-      </svg>
-
-      {/* tooltip（HTML 层，便于换行） */}
+      {/* tooltip（HTML 层） */}
       <Show when={tooltipData()}>
         {(td) => {
-          const e = td().e;
-          const x = td().x;
           const tipWidth = 180;
-          let left = x + 12;
-          if (left + tipWidth > width()) left = x - tipWidth - 12;
-          if (left < 0) left = 8;
-          const top = PADDING_TOP;
+          const left = () => {
+            const x = td().x;
+            let l = x + 12;
+            if (l + tipWidth > width()) l = x - tipWidth - 12;
+            if (l < 0) l = 8;
+            return l;
+          };
           return (
             <div
               style={{
                 position: "absolute",
-                left: `${left}px`,
-                top: `${top}px`,
+                left: `${left()}px`,
+                top: `${PADDING_TOP}px`,
                 width: `${tipWidth}px`,
                 background: colors().tooltipBg,
                 border: `1px solid ${colors().tooltipBorder}`,
@@ -679,9 +753,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               }}
             >
               <div style={{ "font-weight": "bold", "margin-bottom": "4px" }}>
-                {e.date}
+                {td().e.date}
               </div>
-              <Show when={e.overallRating !== null}>
+              <Show when={td().e.overallRating !== null}>
                 <div>
                   <span
                     style={{
@@ -694,13 +768,13 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       "vertical-align": "middle",
                     }}
                   />
-                  总评：{e.overallRating!.toFixed(2)}
+                  总评：{td().e.overallRating!.toFixed(2)}
                   <span style={{ opacity: 0.7 }}>
-                    {" "}（{e.overallVotes} 人）
+                    {" "}（{td().e.overallVotes} 人）
                   </span>
                 </div>
               </Show>
-              <Show when={e.overallRating === null}>
+              <Show when={td().e.overallRating === null}>
                 <div style={{ opacity: 0.6 }}>
                   <span
                     style={{
@@ -717,7 +791,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   总评：暂无
                 </div>
               </Show>
-              <Show when={e.myRating !== null}>
+              <Show when={td().e.myRating !== null}>
                 <div>
                   <span
                     style={{
@@ -730,10 +804,10 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       "vertical-align": "middle",
                     }}
                   />
-                  我的评分：{e.myRating!.toFixed(0)}
+                  我的评分：{td().e.myRating!.toFixed(0)}
                 </div>
               </Show>
-              <Show when={e.myRating === null}>
+              <Show when={td().e.myRating === null}>
                 <div style={{ opacity: 0.6 }}>
                   <span
                     style={{
