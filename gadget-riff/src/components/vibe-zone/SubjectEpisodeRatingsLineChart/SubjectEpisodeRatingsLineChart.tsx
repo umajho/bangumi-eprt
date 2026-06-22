@@ -40,16 +40,15 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // overall 点尺寸：以面积表示评分人数
 const POINT_MIN_RADIUS = 2.5;
-const POINT_MAX_RADIUS = 20; // 硬编码最大半径
-// 面积缩放：使用平方根关系（面积 ∝ 半径²），以对数压缩避免极端值
-function overallPointRadius(votes: number): number {
-  if (votes <= 0) return POINT_MIN_RADIUS;
-  // 对数缩放：votes=1 → 接近最小，votes 越大越接近最大
-  const t = Math.log10(votes + 1) / Math.log10(1000 + 1); // 0..1（1000 人封顶）
-  const clamped = Math.min(1, Math.max(0, t));
-  const r = POINT_MIN_RADIUS +
-    (POINT_MAX_RADIUS - POINT_MIN_RADIUS) * clamped;
-  return Math.min(POINT_MAX_RADIUS, r);
+const POINT_MAX_RADIUS = 12; // 硬编码最大半径
+// 面积缩放：面积与人数线性对应，并受最小/最大半径约束
+function overallPointRadius(votes: number, maxVotes: number): number {
+  if (votes <= 0 || maxVotes <= 0) return POINT_MIN_RADIUS;
+  const t = Math.min(1, Math.max(0, votes / maxVotes));
+  const minArea = POINT_MIN_RADIUS * POINT_MIN_RADIUS;
+  const maxArea = POINT_MAX_RADIUS * POINT_MAX_RADIUS;
+  const area = minArea + (maxArea - minArea) * t;
+  return Math.min(POINT_MAX_RADIUS, Math.sqrt(area));
 }
 
 // y 轴渐变色：从底部（冷色）到顶部（暖色），light/dark 各一套
@@ -884,7 +883,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             {(i) => {
               const ep = () => episodes()[i()];
               const x = () => xScale(ep().timestamp);
-              const overallR = () => overallPointRadius(ep().overallVotes);
+              const overallR = () =>
+                overallPointRadius(ep().overallVotes, maxVotes());
               return (
                 <g>
                   <Show when={ep().overallRating !== null}>
@@ -930,7 +930,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   <circle
                     cx={td().x}
                     cy={yScale(td().e.overallRating!)}
-                    r={overallPointRadius(td().e.overallVotes)}
+                    r={overallPointRadius(td().e.overallVotes, maxVotes())}
                     fill={colors().overall}
                     fill-opacity={0.85}
                     stroke={colors().bg}
@@ -975,7 +975,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     // 从右向左：idx=0 最靠右
                     const cx = () =>
                       legendRight - POINT_MAX_RADIUS - idx * slotWidth;
-                    const r = () => overallPointRadius(n());
+                    const r = () => overallPointRadius(n(), maxVotes());
                     return (
                       <g>
                         <circle
@@ -989,10 +989,15 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                         />
                         <text
                           x={cx()}
-                          y={pointsY + POINT_MAX_RADIUS + 2}
+                          y={pointsY}
                           text-anchor="middle"
-                          font-size="8"
-                          fill={colors().text}
+                          dominant-baseline="middle"
+                          font-size="9"
+                          font-weight="700"
+                          fill={colors().bg}
+                          stroke={colors().text}
+                          stroke-width="0.9"
+                          paint-order="stroke"
                         >
                           {n()}
                         </text>
