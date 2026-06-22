@@ -68,6 +68,8 @@ export function processSubjectEpListPage(ctx: Context, opts: {
         subjectId: opts.subjectId,
         collectDataPoints: (_subjectId) => {
           return items.flatMap((item) => {
+            if (item.sortPrefix) return [];
+
             let date: `${number}-${number}-${number}` | null = null;
             for (const smallEl of item.liEl.querySelectorAll("small.grey")) {
               const m = /首播:(\d{4}-\d{2}-\d{2})/.exec(smallEl.textContent);
