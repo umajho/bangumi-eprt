@@ -7,7 +7,7 @@ import { processPrgList } from "../element-processors/prg-list";
 import type { Context } from "../context";
 
 export function processRootPage(ctx: Context) {
-  collectCacheEntries(ctx);
+  putCacheEntries(ctx);
 
   const { initializeCluetip } = processCluetip(ctx);
 
@@ -31,7 +31,7 @@ export function processRootPage(ctx: Context) {
   processTimelineColumn(ctx);
 }
 
-function collectCacheEntries(ctx: Context) {
+function putCacheEntries(ctx: Context) {
   for (const tinyHeaderEl of document.querySelectorAll(".tinyHeader")) {
     const textTipEl = tinyHeaderEl
       .querySelector<HTMLAnchorElement>(".textTip");

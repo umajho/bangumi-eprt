@@ -23,7 +23,7 @@ export async function processEpPage(ctx: Context, opts: {
   subjectId: SubjectId;
   episodeId: EpisodeId;
 }) {
-  collectCacheEntries(ctx);
+  putCacheEntries(ctx);
 
   const columnEpAEl = document.querySelector("#columnEpA");
   const epDescEl = columnEpAEl?.querySelector(":scope > .epDesc");
@@ -63,7 +63,7 @@ export async function processEpPage(ctx: Context, opts: {
   }
 }
 
-function collectCacheEntries(ctx: Context) {
+function putCacheEntries(ctx: Context) {
   // TODO: `putEntryIntoSubjectCache`.
 
   for (const aEl of document.querySelectorAll(".sideEpList > li > a.l")) {

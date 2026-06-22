@@ -9,7 +9,7 @@ export function processMusicSubjectEpSection(ctx: Context, opts: {
   subjectEpSection: HTMLDivElement;
   subjectId: SubjectId;
 }) {
-  collectCacheEntries(ctx, { subjectEpSection: opts.subjectEpSection });
+  putCacheEntries(ctx, { subjectEpSection: opts.subjectEpSection });
 
   const subtitle = opts.subjectEpSection.querySelector(":scope > h2.subtitle");
   if (subtitle) {
@@ -60,7 +60,7 @@ export function processMusicSubjectEpSection(ctx: Context, opts: {
   }
 }
 
-function collectCacheEntries(ctx: Context, opts: {
+function putCacheEntries(ctx: Context, opts: {
   subjectEpSection: HTMLDivElement;
 }) {
   // TODO: `putEntryIntoSubjectCache`.
