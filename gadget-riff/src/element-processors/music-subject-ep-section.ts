@@ -66,9 +66,7 @@ function collectCacheEntries(ctx: Context, opts: {
   // TODO: `putEntryIntoSubjectCache`.
 
   for (
-    const liEl of [
-      ...opts.subjectEpSection.querySelectorAll(".line_list > li"),
-    ]
+    const liEl of [...opts.subjectEpSection.querySelectorAll(".line_list > li")]
       .filter((li) => li.querySelector("cite"))
   ) {
     const aEl = liEl.querySelector("h6 > a");
