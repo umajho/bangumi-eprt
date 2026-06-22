@@ -12,7 +12,7 @@ import * as epDataHelpers from "../utils/episode-data-helpers";
 import { readonlyPageData } from "../stores/readonly-page-data";
 import { SmallStars } from "./SmallStars";
 import type { Context } from "../context";
-import { getMyRatingModalSingletonInstance } from "./MyRatingModal";
+import { getMyRatingModalSingletonInstance } from "./modals/MyRatingModal";
 
 const TAG_NAME = makeCustomElementTagName("my-rating-compact");
 

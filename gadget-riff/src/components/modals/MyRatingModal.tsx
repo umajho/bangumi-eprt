@@ -1,9 +1,9 @@
 import { createEffect, createSignal, Show } from "solid-js";
 import { render } from "solid-js/web";
 
-import type { Context } from "../context";
-import { type EpisodeId, makeHtmlId, type SubjectId } from "../definitions";
-import { MyRating } from "./MyRating";
+import type { Context } from "../../context";
+import { type EpisodeId, makeHtmlId, type SubjectId } from "../../definitions";
+import { MyRating } from "../MyRating";
 
 const DIALOG_ID = makeHtmlId("my-rating-modal-dialog");
 

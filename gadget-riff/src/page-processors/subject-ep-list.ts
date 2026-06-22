@@ -1,5 +1,6 @@
 import { createMyRatingInstance } from "../components/MyRating";
 import { createRateInfoInstance } from "../components/RateInfo";
+import { createShowSubjectEpisodeRatingsLineChartModalButtonInstance } from "../components/ShowSubjectEpisodeRatingsLineChartModalButton";
 import type { Context } from "../context";
 import type { EpisodeId, SubjectId } from "../definitions";
 import { createClearDivElement } from "../utils/elements";
@@ -7,24 +8,23 @@ import { createClearDivElement } from "../utils/elements";
 export function processSubjectEpListPage(ctx: Context, opts: {
   subjectId: SubjectId;
 }) {
-  const editEpBatchEl = document.querySelector('[name="edit_ep_batch"]');
+  const editEpBatchEl = document.querySelector<HTMLFormElement>(
+    '[name="edit_ep_batch"]',
+  );
   if (!editEpBatchEl) return;
 
-  for (
-    const [i, liEl] of [...editEpBatchEl.querySelectorAll(".line_list > li")]
-      .filter((li) => li.querySelector('[name="ep_mod[]"]'))
-      .entries()
-  ) {
+  const liEls = [
+    ...editEpBatchEl.querySelectorAll<HTMLLIElement>(".line_list > li"),
+  ]
+    .filter((li) => li.querySelector('[name="ep_mod[]"]'));
+
+  collectCacheEntries(ctx, { liEls });
+
+  for (const [i, liEl] of liEls.entries()) {
     liEl.querySelector("h6")
       ?.insertAdjacentElement("afterend", createClearDivElement());
 
-    const episodeId = ((): EpisodeId | null => {
-      const href = liEl.querySelector<HTMLAnchorElement>("h6 > a")?.href;
-      if (!href) return null;
-      const match = href.match(/\/ep\/(\d+)/);
-      if (!match) return null;
-      return Number(match[1]) as EpisodeId;
-    })();
+    const episodeId = getEpisodeIdFromLi(liEl);
     if (episodeId === null) continue;
 
     const hasUserWatched = (() => {
@@ -67,4 +67,59 @@ export function processSubjectEpListPage(ctx: Context, opts: {
 
     liEl.appendChild(createClearDivElement());
   }
+
+  {
+    const instance =
+      createShowSubjectEpisodeRatingsLineChartModalButtonInstance(ctx, {
+        subjectId: opts.subjectId,
+        collectDataPoints: (_subjectId) => {
+          return liEls.flatMap((liEl) => {
+            const episodeId = getEpisodeIdFromLi(liEl);
+            if (episodeId === null) return [];
+
+            let date: `${number}-${number}-${number}` | null = null;
+            for (const smallEl of liEl.querySelectorAll("small.grey")) {
+              const m = /首播:(\d{4}-\d{2}-\d{2})/.exec(smallEl.textContent);
+              if (m) {
+                date = m[1] as `${number}-${number}-${number}`;
+                break;
+              }
+            }
+            return date ? [{ episodeId, date }] : [];
+          });
+        },
+      });
+
+    document.querySelector("#columnInSubjectA")?.prepend(instance.element);
+  }
+}
+
+function collectCacheEntries(ctx: Context, opts: { liEls: HTMLLIElement[] }) {
+  // TODO: `putEntryIntoSubjectCache`.
+
+  for (const liEl of opts.liEls) {
+    const aEl = liEl.querySelector("h6 > a");
+    if (!aEl) continue;
+
+    const title = aEl.textContent;
+    if (!title) continue;
+
+    const episodeId = getEpisodeIdFromLi(liEl);
+    const m = /^(\d+?)\.(.+)$/.exec(title);
+    if (episodeId === null || !m) continue;
+
+    const sort = Number(m[1]);
+    const name = m[2];
+    if (isNaN(sort)) continue;
+
+    ctx.bgmClient.putEntryIntoEpisodeCache(episodeId, { name, sort });
+  }
+}
+
+function getEpisodeIdFromLi(liEl: HTMLLIElement): EpisodeId | null {
+  const epModEl = liEl.querySelector('[name="ep_mod[]"]');
+  if (!epModEl) return null;
+  const episodeId = Number(epModEl.getAttribute("value")) as EpisodeId;
+  if (isNaN(episodeId)) return null;
+  return episodeId;
 }
