@@ -494,3 +494,18 @@ matrix works correctly:
 | Magic Trackpad gestures    | ✓ / ✓ (as applicable) | ✓   |
 
 No previously working interaction should regress while fixing this issue.
+
+## `0.100.4` @ 2
+
+This is a follow-up to “`0.100.4` @ 1”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `XXX`
+
+### Additional Requirements
+
+- If an input method supports both zooming and panning (e.g. Magic Trackpad),
+  and the user's intent is clearly to pan, temporarily suppress zooming so that
+  panning remains smooth and uninterrupted.
+- Once a gesture has been recognized as a pan gesture, continue treating it as a
+  pan gesture until the gesture ends.

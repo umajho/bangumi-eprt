@@ -174,6 +174,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   onCleanup(() => {
     resizeObserver?.disconnect();
     mo?.disconnect();
+    if (wheelGestureTimer !== null) clearTimeout(wheelGestureTimer);
   });
 
   onMount(() => {
@@ -369,11 +370,43 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   //   - 垂直滚动（鼠标滚轮 / 触摸板双指垂直）→ 水平缩放（围绕指针位置）
   //   - 触摸板双指捏合（ctrlKey）→ 缩放
   //   - 触摸板水平手势（|deltaX| 主导）→ 水平平移
-  // 使用主轴判定（|deltaX| > |deltaY|）区分水平平移与垂直缩放，
-  // 避免水平滑动时的微小垂直漂移误触发缩放。
+  // 手势锁定：在连续 wheel 事件中保持首次分类不变，避免水平平移过程中
+  // 因垂直漂移事件误触发缩放；事件空闲超过阈值后手势结束，重新分类。
+  let wheelGesture: "none" | "pan" | "zoom" = "none";
+  let wheelGestureTimer: ReturnType<typeof setTimeout> | null = null;
+  const WHEEL_GESTURE_IDLE_MS = 200;
+
   const onWheel = (ev: WheelEvent) => {
     ev.preventDefault();
     if (!containerRef) return;
+
+    // 续期手势：每次 wheel 事件都重置空闲计时器
+    if (wheelGestureTimer !== null) clearTimeout(wheelGestureTimer);
+    wheelGestureTimer = setTimeout(() => {
+      wheelGesture = "none";
+      wheelGestureTimer = null;
+    }, WHEEL_GESTURE_IDLE_MS);
+
+    // 手势起始时按主轴分类；一旦分类，在本手势内保持不变
+    if (wheelGesture === "none") {
+      const isPinch = ev.ctrlKey || ev.metaKey;
+      if (isPinch) wheelGesture = "zoom";
+      else if (Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) wheelGesture = "pan";
+      else wheelGesture = "zoom";
+    }
+
+    if (wheelGesture === "pan") {
+      // 遵循平台原生滚动方向：向右滑动 → 查看右侧（更晚）内容 → pan 增大
+      if (ev.deltaX === 0) return;
+      const v = viewDomain();
+      const timeDelta = (ev.deltaX / (innerWidth() || 1)) * v.visibleSpan;
+      const newPan = panOffset() + timeDelta;
+      setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
+      return;
+    }
+
+    // 缩放（鼠标滚轮 / 触摸板垂直 / 捏合）：围绕指针位置
+    if (ev.deltaY === 0) return;
 
     const rect = containerRef.getBoundingClientRect();
     const mouseX = ev.clientX - rect.left;
@@ -383,20 +416,6 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     );
     const ratio = innerWidth() > 0 ? innerX / innerWidth() : 0;
 
-    const isPinch = ev.ctrlKey || ev.metaKey;
-    // 水平平移：非捏合且水平轴占主导
-    if (!isPinch && Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) {
-      // 遵循平台原生滚动方向：向右滑动 → 查看右侧（更晚）内容 → pan 增大
-      const v = viewDomain();
-      const timeDelta = (ev.deltaX / (innerWidth() || 1)) * v.visibleSpan;
-      const newPan = panOffset() + timeDelta;
-      setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
-      return;
-    }
-
-    if (ev.deltaY === 0) return;
-
-    // 缩放（鼠标滚轮 / 触摸板垂直 / 捏合）：围绕指针位置
     const oldZoom = zoom();
     const factor = ev.deltaY < 0 ? 1.1 : 1 / 1.1;
     const newZoom = Math.min(
