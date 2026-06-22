@@ -211,7 +211,7 @@ Optimize the implementation.
 This is a follow-up to “`0.100.2` @ 2”.
 
 - Instruction polisher: `GPT-5.5`
-- Executor: `XXX`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
 
 ### Bugs to Fix
 
@@ -305,3 +305,71 @@ The legend should:
 - Indicate that point area represents rating count.
 - Remain visible and readable at all zoom levels.
 - Not overlap chart content.
+
+## `0.100.3` @ 2
+
+This is a follow-up to “`0.100.3` @ 1”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
+
+### Bugs to Fix
+
+#### Episode Title Labels Missing
+
+The vertical episode title labels are no longer rendered.
+
+Restore the labels and ensure they remain visible across:
+
+- initial render,
+- zooming,
+- panning,
+- theme changes.
+
+#### Legend Positioning
+
+The rating-count legend is currently positioned between the `9.0` and `10.0`
+y-axis ticks.
+
+This is incorrect.
+
+Requirements:
+
+- Reserve additional vertical space above the plotting area.
+- Keep the `10.0` tick at the top of the plotting area.
+- Render the legend above the `10.0` tick.
+- Ensure the legend does not overlap:
+
+  - the plot area,
+  - axis labels,
+  - axis guide lines,
+  - episode labels.
+
+#### Legend Spacing
+
+The example points in the rating-count legend are too close together.
+
+Increase spacing so that:
+
+- adjacent example points do not visually touch,
+- labels associated with different example points do not touch,
+- the legend remains readable at all supported chart widths.
+
+### Additional Requirements
+
+#### Legend Scaling
+
+The largest example point shown in the rating-count legend must represent the
+maximum rating count among all episodes in the current subject.
+
+Requirements:
+
+- Compute the maximum using the currently loaded subject data.
+- Use the same sizing function as the actual chart points.
+- The largest legend point must match the visual size that would be used for an
+  episode with that maximum rating count.
+- The displayed count value for that legend entry must be the actual maximum
+  rating count.
+
+The legend and chart must therefore remain synchronized whenever the underlying
+rating-count distribution changes.

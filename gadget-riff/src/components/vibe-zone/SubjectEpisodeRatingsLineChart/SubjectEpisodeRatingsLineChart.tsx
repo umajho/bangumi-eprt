@@ -25,10 +25,10 @@ export interface DataPoint {
   date: `${number}-${number}-${number}`; // YYYY-MM-DD
 }
 
-const CHART_HEIGHT = 360;
+const CHART_HEIGHT = 400;
 const PADDING_LEFT = 52;
 const PADDING_RIGHT = 16;
-const PADDING_TOP = 16;
+const PADDING_TOP = 44; // 顶部预留图例空间
 const PADDING_BOTTOM = 40;
 const Y_MIN = 0;
 const Y_MAX = 10;
@@ -57,13 +57,31 @@ function yGradientColors(dark: boolean): string[] {
   // 11 个刻度（0..10），从低到高
   if (dark) {
     return [
-      "#5b7fff", "#5f86f6", "#6a8dec", "#7994de", "#8b9bcc",
-      "#9da3b8", "#aeaba6", "#bfb294", "#d0ba82", "#e1c170", "#f2c95e",
+      "#5b7fff",
+      "#5f86f6",
+      "#6a8dec",
+      "#7994de",
+      "#8b9bcc",
+      "#9da3b8",
+      "#aeaba6",
+      "#bfb294",
+      "#d0ba82",
+      "#e1c170",
+      "#f2c95e",
     ];
   }
   return [
-    "#3f51b5", "#4556ab", "#51619b", "#616f86", "#757d6f",
-    "#8a8b58", "#a09943", "#b7a72f", "#cfb51c", "#e7c30a", "#ffd400",
+    "#3f51b5",
+    "#4556ab",
+    "#51619b",
+    "#616f86",
+    "#757d6f",
+    "#8a8b58",
+    "#a09943",
+    "#b7a72f",
+    "#cfb51c",
+    "#e7c30a",
+    "#ffd400",
   ];
 }
 
@@ -612,6 +630,26 @@ export const SubjectEpisodeRatingsLineChart: Component<{
 
   const width = () => Math.max(containerWidth(), 1);
 
+  // 当前 subject 中最大的评分人数（用于图例最大点）
+  const maxVotes = createMemo(() => {
+    let max = 0;
+    for (const e of episodes()) {
+      if (e.overallVotes > max) max = e.overallVotes;
+    }
+    return max;
+  });
+
+  // 图例示例点：最小、中间值、最大（最大 = 实际最大评分人数）
+  const legendExamples = createMemo(() => {
+    const mx = maxVotes();
+    if (mx <= 1) return [1];
+    // 选择 3-4 个示例：1, 中间, 最大
+    const mid = Math.max(2, Math.round(mx / 2));
+    if (mx <= 2) return [1, mx];
+    if (mx <= 10) return [1, mid, mx];
+    return [1, mid, mx];
+  });
+
   const tooltipData = createMemo(() => {
     const idx = hoverIndex();
     if (idx === null) return null;
@@ -757,6 +795,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               const ep = () => episodes()[i()];
               const x = () => xScale(ep().timestamp);
               const isSelected = () => selectedIndex() === i();
+              const titleText = () => ep().title ?? "";
               return (
                 <g>
                   <line
@@ -768,43 +807,38 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     stroke-width={1}
                     stroke-dasharray="2,3"
                   />
-                  <Show when={ep().title}>
-                    <a
-                      href={`/ep/${ep().episodeId as number}`}
-                      data-ep-link=""
-                      data-ep-link-id={ep().episodeId as number}
-                      style={{
-                        cursor: "pointer",
-                        "text-decoration": isSelected() ? "underline" : "none",
-                      }}
-                      onClick={(ev) => {
-                        // 非触摸设备：点击标题立即跳转（默认行为）
-                        // 触摸设备：由 handleTap 处理选择/跳转
-                        if (isTouchDevice) {
-                          ev.preventDefault();
-                          handleTap(
-                            ev.clientX,
-                            ev.currentTarget as unknown as Element,
-                          );
-                        }
-                      }}
-                    >
-                      <text
-                        x={x() + 4}
-                        y={CHART_HEIGHT - PADDING_BOTTOM - 4}
-                        transform={`rotate(-90, ${x() + 4}, ${
-                          CHART_HEIGHT - PADDING_BOTTOM - 4
-                        })`}
-                        text-anchor="start"
-                        font-size="10"
-                        fill={isSelected()
-                          ? colors().overall
-                          : colors().guideText}
-                      >
-                        {ep().title}
-                      </text>
-                    </a>
-                  </Show>
+                  <text
+                    x={x() + 4}
+                    y={CHART_HEIGHT - PADDING_BOTTOM - 4}
+                    transform={`rotate(-90, ${x() + 4}, ${
+                      CHART_HEIGHT - PADDING_BOTTOM - 4
+                    })`}
+                    text-anchor="start"
+                    font-size="10"
+                    fill={isSelected() ? colors().overall : colors().guideText}
+                    data-ep-link="true"
+                    data-ep-link-id={ep().episodeId as number}
+                    style={{
+                      cursor: "pointer",
+                      "text-decoration": isSelected() ? "underline" : "none",
+                      "pointer-events": "auto",
+                    }}
+                    onClick={(ev) => {
+                      if (isTouchDevice) {
+                        ev.preventDefault();
+                        handleTap(
+                          ev.clientX,
+                          ev.currentTarget as unknown as Element,
+                        );
+                      } else {
+                        ev.preventDefault();
+                        window.location.href = `/ep/${ep()
+                          .episodeId as number}`;
+                      }
+                    }}
+                  >
+                    {titleText()}
+                  </text>
                 </g>
               );
             }}
@@ -902,19 +936,19 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             )}
           </Show>
 
-          {/* 评分人数图例（右上角，10.0 刻度上方） */}
+          {/* 评分人数图例（绘图区上方，右侧） */}
           {(() => {
-            const legendX = width() - PADDING_RIGHT - 4;
-            const legendY = PADDING_TOP + 2;
-            const examples = [1, 50, 500, 1000];
+            const examples = legendExamples();
+            const legendRight = width() - PADDING_RIGHT;
+            const labelY = 12;
+            const pointsY = 28;
+            // 从右向左排列，间距基于最大点半径 + 文本宽度
+            const slotWidth = 2 * POINT_MAX_RADIUS + 24;
             return (
-              <g
-                style={{ "pointer-events": "none" }}
-                opacity={0.92}
-              >
+              <g style={{ "pointer-events": "none" }}>
                 <text
-                  x={legendX}
-                  y={legendY}
+                  x={legendRight}
+                  y={labelY}
                   text-anchor="end"
                   font-size="9"
                   fill={colors().text}
@@ -923,14 +957,15 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                 </text>
                 <Index each={examples}>
                   {(n, idx) => {
+                    // 从右向左：idx=0 最靠右
+                    const cx = () =>
+                      legendRight - POINT_MAX_RADIUS - idx * slotWidth;
                     const r = () => overallPointRadius(n());
-                    const cx = () => legendX - 8 - idx * 16;
-                    const cy = () => legendY + 14;
                     return (
                       <g>
                         <circle
                           cx={cx()}
-                          cy={cy()}
+                          cy={pointsY}
                           r={r()}
                           fill={colors().overall}
                           fill-opacity={0.85}
@@ -939,7 +974,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                         />
                         <text
                           x={cx()}
-                          y={cy() + POINT_MAX_RADIUS + 9}
+                          y={pointsY + POINT_MAX_RADIUS + 9}
                           text-anchor="middle"
                           font-size="8"
                           fill={colors().text}
