@@ -824,13 +824,16 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     text-anchor="start"
                     font-size="10"
                     fill={titleFill()}
-                    font-weight={isSelected() || isHovered() ? "bold" : "normal"}
+                    font-weight={isSelected() || isHovered()
+                      ? "bold"
+                      : "normal"}
                     data-ep-link="true"
                     data-ep-link-id={ep().episodeId as number}
                     style={{
                       cursor: "pointer",
-                      "text-decoration":
-                        isSelected() || isHovered() ? "underline" : "none",
+                      "text-decoration": isSelected() || isHovered()
+                        ? "underline"
+                        : "none",
                       "pointer-events": "auto",
                     }}
                     onMouseEnter={() =>
