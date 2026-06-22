@@ -373,3 +373,67 @@ Requirements:
 
 The legend and chart must therefore remain synchronized whenever the underlying
 rating-count distribution changes.
+
+## `0.100.3` @ 3
+
+This is a follow-up to “`0.100.3` @ 2”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `XXX`
+
+### Bugs to Fix
+
+#### Trackpad Gesture Direction
+
+The horizontal navigation direction for trackpad gestures is currently reversed.
+
+Requirements:
+
+- Follow the platform's native scrolling direction.
+- Ensure Apple Magic Trackpad gestures behave consistently with other
+  horizontally scrollable content in macOS.
+
+#### Touch Interaction with Episode Title Links
+
+On Android Chrome, tapping an episode title immediately follows the link.
+
+This is incorrect.
+
+Requirements:
+
+- On touch devices, the first tap must only select the episode.
+- The first tap must never navigate, regardless of whether the tap occurs on the
+  title, guide line, point, or any other episode-associated element.
+- Navigation may occur only when the already-selected episode title is tapped
+  again.
+- Verify behavior specifically on Android Chrome.
+
+#### Link Hover Feedback
+
+On macOS Chrome, hovering over an episode title does not provide any indication
+that it is clickable.
+
+Requirements:
+
+- Episode titles must expose standard link affordances on pointer-based devices.
+- The cursor should indicate that the element is clickable.
+- Hover styling should make the interactive nature of the title visually
+  apparent.
+- The styling should remain consistent with both light and dark themes.
+
+### Additional Requirements
+
+#### Maximum Point Size
+
+The current maximum point size for rating-count visualization is too small.
+
+Increase the hardcoded maximum size substantially.
+
+Requirements:
+
+- The maximum point area should be at least 3× larger than the current maximum.
+- The legend must be updated automatically to reflect the new scale.
+- The largest point should remain visually distinguishable from medium-sized
+  points.
+- The size cap should still prevent excessive overlap with nearby chart
+  elements.

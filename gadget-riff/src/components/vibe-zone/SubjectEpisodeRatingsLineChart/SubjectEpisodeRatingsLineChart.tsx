@@ -40,7 +40,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // overall 点尺寸：以面积表示评分人数
 const POINT_MIN_RADIUS = 2.5;
-const POINT_MAX_RADIUS = 7; // 硬编码最大半径
+const POINT_MAX_RADIUS = 12; // 硬编码最大半径（面积约为旧值的 3 倍）
 // 面积缩放：使用平方根关系（面积 ∝ 半径²），以对数压缩避免极端值
 function overallPointRadius(votes: number): number {
   if (votes <= 0) return POINT_MIN_RADIUS;
@@ -157,6 +157,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   const [panOffset, setPanOffset] = createSignal(0); // 时间偏移（毫秒）
   const [hoverIndex, setHoverIndex] = createSignal<number | null>(null);
   const [selectedIndex, setSelectedIndex] = createSignal<number | null>(null);
+  const [hoveredLinkId, setHoveredLinkId] = createSignal<number | null>(null);
   const [dark, setDark] = createSignal(isDarkMode());
 
   // 触摸设备检测（用于区分 tap/click 交互模式）
@@ -403,12 +404,13 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     }
 
     // 平移：优先 deltaX（触摸板水平手势），否则用 deltaY（垂直滚动也作水平平移）
+    // 遵循平台原生滚动方向：向右滑动 → 查看右侧（更晚）内容 → pan 增大
     const delta = ev.deltaX !== 0 ? ev.deltaX : ev.deltaY;
     if (delta === 0) return;
     const v = viewDomain();
     // 像素 → 时间转换
     const timeDelta = (delta / (innerWidth() || 1)) * v.visibleSpan;
-    const newPan = panOffset() - timeDelta;
+    const newPan = panOffset() + timeDelta;
     setPanOffset(Math.min(Math.max(0, newPan), v.maxPan));
   };
 
@@ -795,7 +797,13 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               const ep = () => episodes()[i()];
               const x = () => xScale(ep().timestamp);
               const isSelected = () => selectedIndex() === i();
+              const isHovered = () =>
+                hoveredLinkId() === (ep().episodeId as number);
               const titleText = () => ep().title ?? "";
+              const titleFill = () => {
+                if (isSelected() || isHovered()) return colors().overall;
+                return colors().guideText;
+              };
               return (
                 <g>
                   <line
@@ -815,26 +823,31 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     })`}
                     text-anchor="start"
                     font-size="10"
-                    fill={isSelected() ? colors().overall : colors().guideText}
+                    fill={titleFill()}
+                    font-weight={isSelected() || isHovered() ? "bold" : "normal"}
                     data-ep-link="true"
                     data-ep-link-id={ep().episodeId as number}
                     style={{
                       cursor: "pointer",
-                      "text-decoration": isSelected() ? "underline" : "none",
+                      "text-decoration":
+                        isSelected() || isHovered() ? "underline" : "none",
                       "pointer-events": "auto",
                     }}
+                    onMouseEnter={() =>
+                      setHoveredLinkId(ep().episodeId as number)}
+                    onMouseLeave={() => setHoveredLinkId(null)}
                     onClick={(ev) => {
+                      // 触摸设备：由 pointerup → handleTap 统一处理选择/跳转，
+                      // 此处仅阻止默认行为，避免重复触发导致直接跳转。
                       if (isTouchDevice) {
                         ev.preventDefault();
-                        handleTap(
-                          ev.clientX,
-                          ev.currentTarget as unknown as Element,
-                        );
-                      } else {
-                        ev.preventDefault();
-                        window.location.href = `/ep/${ep()
-                          .episodeId as number}`;
+                        ev.stopPropagation();
+                        return;
                       }
+                      // 非触摸设备：点击标题立即跳转
+                      ev.preventDefault();
+                      window.location.href =
+                        `/ep/${ep().episodeId as number}`;
                     }}
                   >
                     {titleText()}
