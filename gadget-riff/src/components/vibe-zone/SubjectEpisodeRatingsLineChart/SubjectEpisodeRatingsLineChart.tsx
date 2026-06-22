@@ -40,7 +40,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 // overall 点尺寸：以面积表示评分人数
 const POINT_MIN_RADIUS = 2.5;
-const POINT_MAX_RADIUS = 12; // 硬编码最大半径（面积约为旧值的 3 倍）
+const POINT_MAX_RADIUS = 20; // 硬编码最大半径
 // 面积缩放：使用平方根关系（面积 ∝ 半径²），以对数压缩避免极端值
 function overallPointRadius(votes: number): number {
   if (votes <= 0) return POINT_MIN_RADIUS;
@@ -523,7 +523,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
       if (idx >= 0) {
         if (selectedIndex() === idx) {
           // 已选中 → 跳转
-          window.location.href = `/ep/${epId}`;
+          window.open(`/ep/${epId}`, "_blank");
           return;
         }
         // 未选中 → 仅选中
@@ -849,8 +849,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       }
                       // 非触摸设备：点击标题立即跳转
                       ev.preventDefault();
-                      window.location.href =
-                        `/ep/${ep().episodeId as number}`;
+                      window.open(`/ep/${ep().episodeId}`, "_blank");
                     }}
                   >
                     {titleText()}
@@ -990,7 +989,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                         />
                         <text
                           x={cx()}
-                          y={pointsY + POINT_MAX_RADIUS + 9}
+                          y={pointsY + POINT_MAX_RADIUS + 2}
                           text-anchor="middle"
                           font-size="8"
                           fill={colors().text}
