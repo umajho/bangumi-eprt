@@ -379,7 +379,7 @@ rating-count distribution changes.
 This is a follow-up to “`0.100.3` @ 2”.
 
 - Instruction polisher: `GPT-5.5`
-- Executor: `XXX`
+- Executor: `GLM 5.2` (OpenRouter) with VSCode
 
 ### Bugs to Fix
 
@@ -437,3 +437,60 @@ Requirements:
   points.
 - The size cap should still prevent excessive overlap with nearby chart
   elements.
+
+## `0.100.4` @ 1
+
+This is a follow-up to “`0.100.3` @ 3”.
+
+- Instruction polisher: `GPT-5.5`
+- Executor: `GLM 5.2` (OpenCode Go) with OpenCode TUI
+
+### Bugs to Fix
+
+#### Mouse Wheel Zooming
+
+Vertical scrolling no longer zooms the chart horizontally.
+
+Restore the previous zoom behavior.
+
+Requirements:
+
+- Scrolling upward should zoom in horizontally.
+- Scrolling downward should zoom out horizontally.
+- The zoom operation should be centered around the current pointer position
+  whenever possible.
+- Zooming should remain smooth and responsive.
+
+#### Regression Prevention
+
+While restoring wheel-based zooming, do not break any existing navigation
+functionality.
+
+The following interactions must continue to work correctly:
+
+- Mouse-wheel zooming.
+- Touch pinch-to-zoom.
+- Touch dragging / panning.
+- Trackpad horizontal panning gestures.
+- Magic Trackpad gestures.
+- Tooltip interaction.
+- Episode selection behavior.
+- Episode title link behavior.
+
+The wheel-zoom fix should be implemented as a targeted regression fix rather
+than a rewrite of the interaction system.
+
+### Verification
+
+Before considering the task complete, verify that the following interaction
+matrix works correctly:
+
+| Input Method               | Zoom                  | Pan |
+| -------------------------- | --------------------- | --- |
+| Mouse wheel                | ✓                     | N/A |
+| Touch pinch                | ✓                     | N/A |
+| Touch drag                 | N/A                   | ✓   |
+| Trackpad horizontal scroll | N/A                   | ✓   |
+| Magic Trackpad gestures    | ✓ / ✓ (as applicable) | ✓   |
+
+No previously working interaction should regress while fixing this issue.
