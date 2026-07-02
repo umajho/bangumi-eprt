@@ -664,6 +664,18 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     return max;
   });
 
+  // 评分人数合计与每集平均评分人数（左下角统计）
+  const votesStats = createMemo(() => {
+    let total = 0;
+    let count = 0;
+    for (const e of episodes()) {
+      total += e.overallVotes;
+      count += 1;
+    }
+    const avg = count > 0 ? total / count : 0;
+    return { total, avg };
+  });
+
   // 图例示例点：最小、中间值、最大（最大 = 实际最大评分人数）
   const legendExamples = createMemo(() => {
     const mx = maxVotes();
@@ -1148,11 +1160,19 @@ export const SubjectEpisodeRatingsLineChart: Component<{
           "font-size": "11px",
           color: colors().text,
           opacity: 0.6,
-          "text-align": "right",
+          display: "flex",
+          "justify-content": "space-between",
+          "align-items": "center",
+          "flex-wrap": "wrap",
+          gap: "8px",
           "margin-top": "4px",
         }}
       >
-        滚轮/双指缩放 · 拖动平移 · 当前缩放 {zoom().toFixed(1)}x
+        <span>
+          评分人数合计 {votesStats().total} · 每集平均评分人数{" "}
+          {votesStats().avg.toFixed(1)}
+        </span>
+        <span>滚轮/双指缩放 · 拖动平移 · 当前缩放 {zoom().toFixed(1)}x</span>
       </div>
     </div>
   );
