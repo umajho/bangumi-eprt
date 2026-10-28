@@ -752,6 +752,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             {(tick, idx) => {
               const y = () => yScale(tick());
               const color = () => yGradient()[idx];
+              const isHighlighted = () => tick() === 0 || tick() === 6;
               return (
                 <g>
                   <line
@@ -760,8 +761,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     x2={width() - PADDING_RIGHT}
                     y2={y()}
                     stroke={color()}
-                    stroke-width={tick() === 0 ? 1.5 : 0.5}
-                    opacity={tick() === 0 ? 1 : 0.55}
+                    stroke-width={isHighlighted() ? 1.5 : 0.5}
+                    opacity={isHighlighted() ? 1 : 0.55}
                   />
                   <text
                     x={PADDING_LEFT - 8}
@@ -769,6 +770,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     text-anchor="end"
                     dominant-baseline="middle"
                     font-size="11"
+                    font-weight={tick() === 6 ? "bold" : "normal"}
                     fill={color()}
                   >
                     {tick().toFixed(1)}
