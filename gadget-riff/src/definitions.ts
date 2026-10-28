@@ -5,6 +5,8 @@ import type { APIResponse } from "./shared/dto";
 export const EPRT_ID_HTML_SAFE = "umajho-bangumi-eprt";
 export const EPRT_ID_ASCII_SAFE = "umajho.bangumi.eprt";
 
+export type SubjectType = "anime" | "book" | "music" | "game" | "real";
+
 export function makeCustomElementTagName<T extends string>(
   name: T,
 ): `${typeof EPRT_ID_HTML_SAFE}-${T}` {

@@ -78,16 +78,18 @@ async function main() {
     }
     case "subject": {
       const subjectId = readonlyPageData.subjectId;
-      if (subjectId) {
-        processSubjectPage(ctx, { subjectId });
+      const subjectType = readonlyPageData.subjectType;
+      if (subjectId && subjectType) {
+        processSubjectPage(ctx, { subjectId, subjectType });
       }
 
       break;
     }
     case "subject_ep_list": {
       const subjectId = readonlyPageData.subjectId;
-      if (subjectId) {
-        processSubjectEpListPage(ctx, { subjectId });
+      const subjectType = readonlyPageData.subjectType;
+      if (subjectId && subjectType) {
+        processSubjectEpListPage(ctx, { subjectId, subjectType });
       }
       break;
     }
@@ -164,9 +166,9 @@ function setUpCustomizationPanelTab(ctx: PrimalContext) {
   });
 }
 
-type BANGUMI_PAGE_TYPE = "root" | "subject" | "subject_ep_list" | "ep";
+type BangumiPageType = "root" | "subject" | "subject_ep_list" | "ep";
 
-function detectPageType(): BANGUMI_PAGE_TYPE | null {
+function detectPageType(): BangumiPageType | null {
   const pathParts = window.location.pathname.split("/").filter(Boolean);
   if (!pathParts.length) {
     return "root";

@@ -1,11 +1,12 @@
 import type { Context } from "../context";
-import type { SubjectId } from "../definitions";
+import type { SubjectId, SubjectType } from "../definitions";
 import { processCluetip } from "../element-processors/cluetip";
 import { processMusicSubjectEpSection } from "../element-processors/music-subject-ep-section";
 import { processPrgList } from "../element-processors/prg-list";
 
 export function processSubjectPage(ctx: Context, opts: {
   subjectId: SubjectId;
+  subjectType: SubjectType;
 }) {
   const { initializeCluetip } = processCluetip(ctx);
 
@@ -18,10 +19,7 @@ export function processSubjectPage(ctx: Context, opts: {
     });
   }
 
-  if (
-    document.querySelector("#headerSubject")?.getAttribute("typeof") ===
-      "v:Music"
-  ) {
+  if (opts.subjectType === "music") {
     const subjectEpSection = document
       .querySelector<HTMLDivElement>(".subject_ep_section");
     if (subjectEpSection) {

@@ -1,4 +1,4 @@
-import type { EpisodeId, SubjectId, UserId } from "../definitions";
+import type { EpisodeId, SubjectId, SubjectType, UserId } from "../definitions";
 
 export const readonlyPageData = {
   get appId(): string {
@@ -36,6 +36,21 @@ export const readonlyPageData = {
       }
     }
 
+    return null;
+  },
+
+  get subjectType(): SubjectType | null {
+    // NOTE: `document.querySelector("#headerSubject")?.getAttribute("typeof")`
+    // 不能用：在章节列表页面中其值为 `"v:"`。
+
+    for (const t of ["anime", "book", "music", "game", "real"] as const) {
+      if (
+        document.querySelector(`#navMenuNeue>li>a[href='/${t}']`)?.classList
+          .contains("focus")
+      ) {
+        return t;
+      }
+    }
     return null;
   },
 

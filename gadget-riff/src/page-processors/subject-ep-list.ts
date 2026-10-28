@@ -2,11 +2,12 @@ import { createMyRatingInstance } from "../components/MyRating";
 import { createRateInfoInstance } from "../components/RateInfo";
 import { createShowSubjectEpisodeRatingsLineChartModalButtonInstance } from "../components/ShowSubjectEpisodeRatingsLineChartModalButton";
 import type { Context } from "../context";
-import type { EpisodeId, SubjectId } from "../definitions";
+import type { EpisodeId, SubjectId, SubjectType } from "../definitions";
 import { createClearDivElement } from "../utils/elements";
 
 export function processSubjectEpListPage(ctx: Context, opts: {
   subjectId: SubjectId;
+  subjectType: SubjectType;
 }) {
   const editEpBatchEl = document.querySelector<HTMLFormElement>(
     '[name="edit_ep_batch"]',
@@ -62,7 +63,7 @@ export function processSubjectEpListPage(ctx: Context, opts: {
     item.liEl.appendChild(createClearDivElement());
   }
 
-  {
+  if (opts.subjectType === "anime" || opts.subjectType === "real") {
     const instance =
       createShowSubjectEpisodeRatingsLineChartModalButtonInstance(ctx, {
         subjectId: opts.subjectId,
