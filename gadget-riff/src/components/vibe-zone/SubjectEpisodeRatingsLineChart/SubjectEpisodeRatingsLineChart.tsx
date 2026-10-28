@@ -664,15 +664,15 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     return max;
   });
 
-  // 评分人数合计与每集平均评分人数（左下角统计）
+  // 评分人数合计与每集平均评分人数（左下角统计，平均值不计无评分剧集）
   const votesStats = createMemo(() => {
     let total = 0;
-    let count = 0;
+    let ratedCount = 0;
     for (const e of episodes()) {
       total += e.overallVotes;
-      count += 1;
+      if (e.overallVotes > 0) ratedCount += 1;
     }
-    const avg = count > 0 ? total / count : 0;
+    const avg = ratedCount > 0 ? total / ratedCount : 0;
     return { total, avg };
   });
 
@@ -1169,7 +1169,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
         }}
       >
         <span>
-          评分人数合计 {votesStats().total} · 每集平均评分人数{" "}
+          评分人数合计 {votesStats().total} · 有评分剧集平均评分数{" "}
           {votesStats().avg.toFixed(1)}
         </span>
         <span>滚轮/双指缩放 · 拖动平移 · 当前缩放 {zoom().toFixed(1)}x</span>
