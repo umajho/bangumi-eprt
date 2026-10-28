@@ -247,6 +247,11 @@ export const MyRating: Component<{
   );
 };
 
+interface MyRatingAlarm {
+  score: Score | null;
+  shouldShowScoreNumber: boolean;
+}
+
 export const InnerMyRating: Component<{
   displayMode: DisplayMode;
   noFloat: boolean;
@@ -262,7 +267,10 @@ export const InnerMyRating: Component<{
   status: Status;
   claimedScore: Score | null;
 }> = (props) => {
-  const [alarmScore, setAlarmScore] = createSignal<Score | null>(null);
+  const [ratingAlarm, setRatingAlarm] = createSignal<MyRatingAlarm>({
+    score: null,
+    shouldShowScoreNumber: false,
+  });
 
   const data = createMemo(() => {
     if (props.status.normal) return props.status.normal;
@@ -308,7 +316,7 @@ export const InnerMyRating: Component<{
             "padding-bottom": "0.5rem",
           }}
         >
-          <Header alarmScore={alarmScore()} />
+          <Header ratingAlarm={ratingAlarm()} />
           <Show when={knownIsVisible() !== null}>
             <VisibilityControl
               isVisible={knownIsVisible()!}
@@ -324,7 +332,7 @@ export const InnerMyRating: Component<{
               <Stars
                 ratedScore={data().ratedScore}
                 onRateEpisode={updateMyScore}
-                setAlarmScore={setAlarmScore}
+                setRatingAlarm={setRatingAlarm}
               />
               <Show
                 when={props.displayMode === "inline_compact" &&
@@ -382,16 +390,21 @@ export const InnerMyRating: Component<{
   );
 };
 
-const Header: Component<{ alarmScore?: Score | null }> = (props) => {
+const Header: Component<{ ratingAlarm: MyRatingAlarm }> = (props) => {
   const alarmText = createMemo(() =>
-    props.alarmScore && describeScore(props.alarmScore)
+    props.ratingAlarm?.score && describeScore(props.ratingAlarm.score)
   );
 
   return (
     <p style="font-size: 12px;">
       我的评价:{" "}
       <Show when={alarmText()}>
-        {(alarmText) => <span class="alarm">{alarmText()}</span>}
+        {(alarmText) => (
+          <span class="alarm">
+            {alarmText()}{" "}
+            {props.ratingAlarm.shouldShowScoreNumber && props.ratingAlarm.score}
+          </span>
+        )}
       </Show>
     </p>
   );
@@ -415,7 +428,7 @@ const VisibilityControl: Component<{
 const Stars: Component<{
   ratedScore: Score | null;
   onRateEpisode?: (score: Score | null) => void;
-  setAlarmScore?: (score: Score | null) => void;
+  setRatingAlarm?: (score: MyRatingAlarm) => void;
 }> = (props) => {
   // oxlint-disable-next-line no-unassigned-vars
   let ref!: HTMLDivElement;
@@ -425,11 +438,19 @@ const Stars: Component<{
   createEffect(() => {
     const s = hoveredScore();
     if (s === "cancel") {
-      // 与 bangumi 自身的行为保持一致，即：悬浮在取消图标上时，显示原先打的分的
-      // 评价文本。
-      props.setAlarmScore?.(props.ratedScore);
+      props.setRatingAlarm?.({
+        // 与 bangumi 自身的行为保持一致，即：悬浮在取消图标上时，显示原先打的分
+        // 的评价文本。
+        score: props.ratedScore,
+        shouldShowScoreNumber: false,
+      });
     } else {
-      props.setAlarmScore?.(s ?? props.ratedScore);
+      props.setRatingAlarm?.({
+        score: s ?? props.ratedScore,
+        // 与 bangumi 自身的行为保持一致，即：只在悬浮（且非悬浮在取消图标上）时
+        // 显示打分数字。
+        shouldShowScoreNumber: !!s,
+      });
     }
   });
   const scoreToHighlight = createMemo((): Score | null => {
