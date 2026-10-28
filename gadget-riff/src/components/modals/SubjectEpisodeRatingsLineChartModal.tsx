@@ -47,8 +47,28 @@ export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
                       关闭
                     </span>
                   </div>
-                  <div class="content">
-                    <div class="section">
+                  <div
+                    class="content"
+                    style={{
+                      "margin-top": 0,
+                      "margin-right": 0,
+                      "margin-left": 0,
+                      "padding-top": 0,
+                      "padding-right": 0,
+                      "padding-left": 0,
+                    }}
+                  >
+                    <div
+                      class="section"
+                      style={{
+                        "margin-top": 0,
+                        "margin-right": 0,
+                        "margin-left": 0,
+                        "padding-top": 0,
+                        "padding-right": 0,
+                        "padding-left": 0,
+                      }}
+                    >
                       <SubjectEpisodeRatingsLineChart
                         ctx={ctx}
                         subjectId={opts().subjectId}

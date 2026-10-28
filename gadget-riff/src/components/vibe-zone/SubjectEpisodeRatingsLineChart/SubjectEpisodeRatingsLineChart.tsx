@@ -792,6 +792,14 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                 opacity="0.45"
               />
             </pattern>
+            <clipPath id="episode-ratings-data-clip">
+              <rect
+                x={PADDING_LEFT}
+                y={0}
+                width={Math.max(0, width() - PADDING_LEFT)}
+                height={CHART_HEIGHT}
+              />
+            </clipPath>
           </defs>
           <rect
             x={PADDING_LEFT}
@@ -890,13 +898,16 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               const isSelected = () => selectedIndex() === i();
               const isHovered = () =>
                 hoveredLinkId() === (ep().episodeId as number);
+              const isTitleHighlighted = () =>
+                hoverIndex() === i() ||
+                (hoverIndex() === null && (isSelected() || isHovered()));
               const titleText = () => ep().title ?? "";
               const titleFill = () => {
-                if (isSelected() || isHovered()) return colors().overall;
+                if (isTitleHighlighted()) return colors().overall;
                 return colors().guideText;
               };
               return (
-                <g>
+                <g clip-path="url(#episode-ratings-data-clip)">
                   <line
                     x1={x()}
                     y1={PADDING_TOP}
@@ -913,14 +924,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     text-anchor="start"
                     font-size="10"
                     fill={titleFill()}
-                    font-weight={isSelected() || isHovered()
-                      ? "bold"
-                      : "normal"}
+                    font-weight={isTitleHighlighted() ? "bold" : "normal"}
                     data-ep-link="true"
                     data-ep-link-id={ep().episodeId as number}
                     style={{
                       cursor: "pointer",
-                      "text-decoration": isSelected() || isHovered()
+                      "text-decoration": isTitleHighlighted()
                         ? "underline"
                         : "none",
                       "pointer-events": "auto",
@@ -931,14 +940,16 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     onClick={(ev) => {
                       // 触摸设备：由 pointerup → handleTap 统一处理选择/跳转，
                       // 此处仅阻止默认行为，避免重复触发导致直接跳转。
-                      if (isTouchDevice) {
-                        ev.preventDefault();
-                        ev.stopPropagation();
-                        return;
-                      }
-                      // 非触摸设备：点击标题立即跳转
                       ev.preventDefault();
-                      window.open(`/ep/${ep().episodeId}`, "_blank");
+                      ev.stopPropagation();
+                      // 标题上也可以开始拖拽；拖拽后的 click 不应触发跳转。
+                      if (isTouchDevice || dragMoved) return;
+                      // 重叠标题可能共享命中区域，跳转目标始终与悬浮辅助线一致。
+                      const idx = hoverIndex();
+                      const target = idx === null
+                        ? ep()
+                        : episodes()[idx] ?? ep();
+                      window.open(`/ep/${target.episodeId}`, "_blank");
                     }}
                   >
                     {titleText()}
@@ -948,98 +959,101 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             }}
           </Index>
 
-          {/* Overall 折线 */}
-          <path
-            d={overallPath()}
-            fill="none"
-            stroke={colors().overall}
-            stroke-width={2}
-            stroke-linejoin="round"
-            stroke-linecap="round"
-          />
+          {/* 数据图层在纵轴处裁剪，避免点或线进入左侧标签区域 */}
+          <g clip-path="url(#episode-ratings-data-clip)">
+            {/* Overall 折线 */}
+            <path
+              d={overallPath()}
+              fill="none"
+              stroke={colors().overall}
+              stroke-width={2}
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
 
-          {/* My 折线 */}
-          <path
-            d={myPath()}
-            fill="none"
-            stroke={colors().my}
-            stroke-width={2}
-            stroke-linejoin="round"
-            stroke-linecap="round"
-          />
+            {/* My 折线 */}
+            <path
+              d={myPath()}
+              fill="none"
+              stroke={colors().my}
+              stroke-width={2}
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
 
-          {/* 数据点标记（仅可见项） */}
-          <Index each={visibleEpisodeIndices()}>
-            {(i) => {
-              const ep = () => episodes()[i()];
-              const x = () => xScale(ep().visualTimestamp);
-              const overallR = () =>
-                overallPointRadius(ep().overallVotes, maxVotes());
-              return (
+            {/* 数据点标记（仅可见项） */}
+            <Index each={visibleEpisodeIndices()}>
+              {(i) => {
+                const ep = () => episodes()[i()];
+                const x = () => xScale(ep().visualTimestamp);
+                const overallR = () =>
+                  overallPointRadius(ep().overallVotes, maxVotes());
+                return (
+                  <g>
+                    <Show when={ep().overallRating !== null}>
+                      <circle
+                        cx={x()}
+                        cy={yScale(ep().overallRating!)}
+                        r={overallR()}
+                        fill={colors().overall}
+                        fill-opacity={0.85}
+                        stroke={colors().bg}
+                        stroke-width={0.5}
+                      />
+                    </Show>
+                    <Show when={ep().myRating !== null}>
+                      <circle
+                        cx={x()}
+                        cy={yScale(ep().myRating!)}
+                        r={2.5}
+                        fill={colors().my}
+                        stroke={colors().bg}
+                        stroke-width={0.5}
+                      />
+                    </Show>
+                  </g>
+                );
+              }}
+            </Index>
+
+            {/* hover 游标线 */}
+            <Show when={tooltipData()}>
+              {(td) => (
                 <g>
-                  <Show when={ep().overallRating !== null}>
+                  <line
+                    x1={td().x}
+                    y1={PADDING_TOP}
+                    x2={td().x}
+                    y2={CHART_HEIGHT - PADDING_BOTTOM}
+                    stroke={colors().cursor}
+                    stroke-width={1}
+                    stroke-dasharray="4,2"
+                  />
+                  <Show when={td().e.overallRating !== null}>
                     <circle
-                      cx={x()}
-                      cy={yScale(ep().overallRating!)}
-                      r={overallR()}
+                      cx={td().x}
+                      cy={yScale(td().e.overallRating!)}
+                      r={overallPointRadius(td().e.overallVotes, maxVotes())}
                       fill={colors().overall}
                       fill-opacity={0.85}
                       stroke={colors().bg}
-                      stroke-width={0.5}
+                      stroke-width={1.5}
                     />
                   </Show>
-                  <Show when={ep().myRating !== null}>
+                  <Show when={td().e.myRating !== null}>
                     <circle
-                      cx={x()}
-                      cy={yScale(ep().myRating!)}
-                      r={2.5}
+                      cx={td().x}
+                      cy={yScale(td().e.myRating!)}
+                      r={4}
                       fill={colors().my}
                       stroke={colors().bg}
-                      stroke-width={0.5}
+                      stroke-width={1.5}
                     />
                   </Show>
                 </g>
-              );
-            }}
-          </Index>
-
-          {/* hover 游标线 */}
-          <Show when={tooltipData()}>
-            {(td) => (
-              <g>
-                <line
-                  x1={td().x}
-                  y1={PADDING_TOP}
-                  x2={td().x}
-                  y2={CHART_HEIGHT - PADDING_BOTTOM}
-                  stroke={colors().cursor}
-                  stroke-width={1}
-                  stroke-dasharray="4,2"
-                />
-                <Show when={td().e.overallRating !== null}>
-                  <circle
-                    cx={td().x}
-                    cy={yScale(td().e.overallRating!)}
-                    r={overallPointRadius(td().e.overallVotes, maxVotes())}
-                    fill={colors().overall}
-                    fill-opacity={0.85}
-                    stroke={colors().bg}
-                    stroke-width={1.5}
-                  />
-                </Show>
-                <Show when={td().e.myRating !== null}>
-                  <circle
-                    cx={td().x}
-                    cy={yScale(td().e.myRating!)}
-                    r={4}
-                    fill={colors().my}
-                    stroke={colors().bg}
-                    stroke-width={1.5}
-                  />
-                </Show>
-              </g>
-            )}
-          </Show>
+              )}
+            </Show>
+          </g>
 
           {/* 评分人数图例（绘图区上方，右侧） */}
           {(() => {
