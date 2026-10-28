@@ -747,6 +747,31 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             fill={colors().bg}
           />
 
+          {/* 0～1 分为不可能区域，用紧密的灰色斜线标示 */}
+          <defs>
+            <pattern
+              id="impossible-rating-hatch"
+              width="4"
+              height="4"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M0 4 L4 0"
+                fill="none"
+                stroke={colors().guideText}
+                stroke-width="1"
+                opacity="0.45"
+              />
+            </pattern>
+          </defs>
+          <rect
+            x={PADDING_LEFT}
+            y={yScale(1)}
+            width={innerWidth()}
+            height={yScale(0) - yScale(1)}
+            fill="url(#impossible-rating-hatch)"
+          />
+
           {/* 水平网格线 + y 轴刻度（渐变色） */}
           <Index each={yTicks}>
             {(tick, idx) => {
@@ -854,10 +879,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   />
                   <text
                     x={x() + 4}
-                    y={CHART_HEIGHT - PADDING_BOTTOM - 4}
-                    transform={`rotate(-90, ${x() + 4}, ${
-                      CHART_HEIGHT - PADDING_BOTTOM - 4
-                    })`}
+                    y={yScale(1) - 4}
+                    transform={`rotate(-90, ${x() + 4}, ${yScale(1) - 4})`}
                     text-anchor="start"
                     font-size="10"
                     fill={titleFill()}
