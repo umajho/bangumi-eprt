@@ -127,6 +127,7 @@ interface EpisodeInfo {
   episodeId: EpisodeId;
   date: `${number}-${number}-${number}`;
   timestamp: number;
+  visualTimestamp: number;
   overallRating: number | null;
   overallVotes: number;
   myRating: number | null;
@@ -227,15 +228,43 @@ export const SubjectEpisodeRatingsLineChart: Component<{
       const overall = averageScore(votes);
       const tv = totalVotes(votes);
       const my = myRating?.score ?? null;
+      const timestamp = parseDate(dp.date);
       result.push({
         episodeId: dp.episodeId,
         date: dp.date,
-        timestamp: parseDate(dp.date),
+        timestamp,
+        visualTimestamp: timestamp,
         overallRating: overall,
         overallVotes: tv,
         myRating: my === null ? null : my,
         title: t[dp.episodeId as number] ?? null,
       });
+    }
+
+    // 仅调整视觉位置：同时间的首集不动，其余剧集等距分布到
+    // 一天或与下一不同时间点之间距离（取较短者）的 2/3 处。
+    for (let groupStart = 0; groupStart < result.length;) {
+      const timestamp = result[groupStart].timestamp;
+      let groupEnd = groupStart + 1;
+      while (
+        groupEnd < result.length &&
+        result[groupEnd].timestamp === timestamp
+      ) {
+        groupEnd += 1;
+      }
+      const groupSize = groupEnd - groupStart;
+      if (groupSize > 1) {
+        const nextTimestamp = result[groupEnd]?.timestamp;
+        const gap = nextTimestamp === undefined
+          ? DAY_MS
+          : Math.max(0, nextTimestamp - timestamp);
+        const spread = Math.min(DAY_MS, gap) * (2 / 3);
+        for (let i = groupStart + 1; i < groupEnd; i++) {
+          result[i].visualTimestamp = timestamp +
+            spread * (i - groupStart) / (groupSize - 1);
+        }
+      }
+      groupStart = groupEnd;
     }
     return result;
   });
@@ -244,15 +273,15 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     Math.max(0, containerWidth() - PADDING_LEFT - PADDING_RIGHT);
   const innerHeight = () => CHART_HEIGHT - PADDING_TOP - PADDING_BOTTOM;
 
-  // x 轴域（时间戳范围），基于 dataPoints 中的日期
+  // x 轴域包含同时间剧集的视觉偏移，确保所有剧集都在默认视口内
   const xDomain = createMemo(() => {
     const eps = episodes();
     if (eps.length === 0) return { min: 0, max: 1 };
     let min = Infinity;
     let max = -Infinity;
     for (const e of eps) {
-      if (e.timestamp < min) min = e.timestamp;
-      if (e.timestamp > max) max = e.timestamp;
+      if (e.visualTimestamp < min) min = e.visualTimestamp;
+      if (e.visualTimestamp > max) max = e.visualTimestamp;
     }
     if (min === max) return { min: min - DAY_MS, max: max + DAY_MS };
     return { min, max };
@@ -293,7 +322,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
         started = false;
         continue;
       }
-      const x = xScale(e.timestamp);
+      const x = xScale(e.visualTimestamp);
       const y = yScale(v);
       path += `${started ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)} `;
       started = true;
@@ -311,7 +340,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     const right = containerWidth() - PADDING_RIGHT + 20;
     const indices: number[] = [];
     for (let i = 0; i < eps.length; i++) {
-      const x = xScale(eps[i].timestamp);
+      const x = xScale(eps[i].visualTimestamp);
       if (x >= left && x <= right) {
         indices.push(i);
         if (eps[i].title === null) ensureTitle(eps[i].episodeId);
@@ -560,7 +589,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     let nearest = 0;
     let nearestDist = Infinity;
     for (let i = 0; i < eps.length; i++) {
-      const x = xScale(eps[i].timestamp);
+      const x = xScale(eps[i].visualTimestamp);
       const d = Math.abs(x - mouseX);
       if (d < nearestDist) {
         nearestDist = d;
@@ -585,7 +614,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     let nearest = 0;
     let nearestDist = Infinity;
     for (let i = 0; i < eps.length; i++) {
-      const x = xScale(eps[i].timestamp);
+      const x = xScale(eps[i].visualTimestamp);
       const d = Math.abs(x - mouseX);
       if (d < nearestDist) {
         nearestDist = d;
@@ -693,7 +722,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     const eps = episodes();
     if (idx < 0 || idx >= eps.length) return null;
     const e = eps[idx];
-    const x = xScale(e.timestamp);
+    const x = xScale(e.visualTimestamp);
     return { e, x };
   });
 
@@ -857,7 +886,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
           <Index each={visibleEpisodeIndices()}>
             {(i) => {
               const ep = () => episodes()[i()];
-              const x = () => xScale(ep().timestamp);
+              const x = () => xScale(ep().visualTimestamp);
               const isSelected = () => selectedIndex() === i();
               const isHovered = () =>
                 hoveredLinkId() === (ep().episodeId as number);
@@ -943,7 +972,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
           <Index each={visibleEpisodeIndices()}>
             {(i) => {
               const ep = () => episodes()[i()];
-              const x = () => xScale(ep().timestamp);
+              const x = () => xScale(ep().visualTimestamp);
               const overallR = () =>
                 overallPointRadius(ep().overallVotes, maxVotes());
               return (
