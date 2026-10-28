@@ -152,7 +152,7 @@ function processMyRatingsInComments(ctx: Context, opts: {
   }) {
     for (
       const el of document.querySelectorAll<HTMLDivElement>(
-        `[id^="post_"]:not(.reply_collapse,.sub_reply_collapse):not([${DATA_ATTRIBUTE_NAME_RATING_IN_COMMENT_INSTALLED}]):has(a.avatar[href$="/user/${myUserTextId}"])`,
+        `[id^="post_"]:not(.reply_collapse,.sub_reply_collapse):not([${DATA_ATTRIBUTE_NAME_RATING_IN_COMMENT_INSTALLED}]):has(> a.avatar[href$="/user/${myUserTextId}"])`,
       )
     ) {
       el.setAttribute(DATA_ATTRIBUTE_NAME_RATING_IN_COMMENT_INSTALLED, "");
