@@ -60,19 +60,31 @@ const ShowModalButton: Component<{
   const singleton = //
     getSubjectEpisodeRatingsLineChartModalSingletonInstance(props.ctx);
 
+  const epDataResp = props.ctx.scoreStore
+    .queryCompleteSubjectDataTracked(props.subjectId);
+
   return (
-    <a
-      class="chiiBtn"
-      href="#"
-      onClick={(ev) => {
-        ev.preventDefault();
-        singleton.open({
-          subjectId: props.subjectId,
-          dataPoints: props.collectDataPoints(props.subjectId),
-        });
-      }}
+    <Show
+      when={epDataResp()[0] != "loading"}
+      fallback={
+        <div style="color: grey">
+          单集评分加载中…
+        </div>
+      }
     >
-      打开单集评分折线图
-    </a>
+      <a
+        class="chiiBtn"
+        href="#"
+        onClick={(ev) => {
+          ev.preventDefault();
+          singleton.open({
+            subjectId: props.subjectId,
+            dataPoints: props.collectDataPoints(props.subjectId),
+          });
+        }}
+      >
+        打开单集评分折线图
+      </a>
+    </Show>
   );
 };
