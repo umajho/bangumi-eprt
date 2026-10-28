@@ -36,6 +36,7 @@ const Y_TICK_STEP = 1;
 const MIN_ZOOM = 1; // 全部剧集
 const MAX_ZOOM = 64;
 const MIN_PIXELS_PER_TICK = 56; // x 轴日期刻度最小间距
+const X_EDGE_PADDING = 16; // 首末剧集的标题与最大圆圈预留空间
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // overall 点尺寸：以面积表示评分人数
@@ -284,7 +285,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
       if (e.visualTimestamp > max) max = e.visualTimestamp;
     }
     if (min === max) return { min: min - DAY_MS, max: max + DAY_MS };
-    return { min, max };
+    const plotWidth = innerWidth();
+    if (plotWidth <= X_EDGE_PADDING * 2) return { min, max };
+    // 将像素边距换算成时间域边距，首末点在最外侧平移位置也能完整显示。
+    const padding = (max - min) * X_EDGE_PADDING /
+      (plotWidth - X_EDGE_PADDING * 2);
+    return { min: min - padding, max: max + padding };
   });
 
   // 缩放后的可视时间范围
