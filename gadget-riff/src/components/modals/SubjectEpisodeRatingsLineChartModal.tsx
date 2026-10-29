@@ -5,6 +5,7 @@ import type { Context } from "../../context";
 import { makeHtmlId, type SubjectId } from "../../definitions";
 import {
   type DataPoint,
+  type DataShown,
   SubjectEpisodeRatingsLineChart,
 } from "../vibe-zone/SubjectEpisodeRatingsLineChart/SubjectEpisodeRatingsLineChart";
 
@@ -22,6 +23,11 @@ export interface SubjectEpisodeRatingsLineChartModalInstance {
 
 let instance: SubjectEpisodeRatingsLineChartModalInstance | null = null;
 
+const DATA_SHOWN_DEFAULT: DataShown = Object.freeze({
+  overallRating: true,
+  myRating: true,
+});
+
 export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
   ctx: Context,
 ) {
@@ -30,6 +36,8 @@ export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
     document.body.appendChild(wrapper);
 
     const [opts, setOpts] = createSignal<Options | null>(null);
+    const [dataShown, setDataShown] = //
+      createSignal<DataShown>(DATA_SHOWN_DEFAULT);
 
     render(() => {
       // oxlint-disable-next-line no-unassigned-vars
@@ -73,6 +81,8 @@ export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
                         ctx={ctx}
                         subjectId={opts().subjectId}
                         dataPoints={opts().dataPoints}
+                        dataShown={dataShown()}
+                        setDataShown={setDataShown}
                       />
                     </div>
                   </div>
@@ -89,6 +99,7 @@ export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
     return {
       open(opts) {
         setOpts(opts);
+        setDataShown(DATA_SHOWN_DEFAULT);
         dialogEl.showModal();
       },
       close() {

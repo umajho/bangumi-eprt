@@ -5,6 +5,7 @@ import {
   Index,
   onCleanup,
   onMount,
+  type Setter,
   Show,
 } from "solid-js";
 
@@ -23,6 +24,10 @@ import type { SubjectDataResponse } from "../../../stores/temporary-global-store
 export interface DataPoint {
   episodeId: EpisodeId;
   date: `${number}-${number}-${number}`; // YYYY-MM-DD
+}
+export interface DataShown {
+  overallRating: boolean;
+  myRating: boolean;
 }
 
 const CHART_HEIGHT = 400;
@@ -152,6 +157,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
   ctx: Context;
   subjectId: SubjectId;
   dataPoints: DataPoint[];
+  dataShown: DataShown;
+  setDataShown: Setter<DataShown>;
 }> = (props) => {
   const [containerWidth, setContainerWidth] = createSignal(0);
   const [zoom, setZoom] = createSignal(1);
@@ -1018,6 +1025,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               stroke-width={2}
               stroke-linejoin="round"
               stroke-linecap="round"
+              visibility={props.dataShown.overallRating ? "visible" : "hidden"}
             />
 
             {/* My 折线 */}
@@ -1028,6 +1036,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               stroke-width={2}
               stroke-linejoin="round"
               stroke-linecap="round"
+              visibility={props.dataShown.myRating ? "visible" : "hidden"}
             />
 
             {/* 数据点标记（仅可见项） */}
@@ -1039,7 +1048,10 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   overallPointRadius(ep().overallVotes, maxVotes());
                 return (
                   <g>
-                    <Show when={ep().overallRating !== null}>
+                    <Show
+                      when={props.dataShown.overallRating &&
+                        ep().overallRating !== null}
+                    >
                       <circle
                         cx={x()}
                         cy={yScale(ep().overallRating!)}
@@ -1050,7 +1062,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                         stroke-width={0.5}
                       />
                     </Show>
-                    <Show when={ep().myRating !== null}>
+                    <Show
+                      when={props.dataShown.myRating && ep().myRating !== null}
+                    >
                       <circle
                         cx={x()}
                         cy={yScale(ep().myRating!)}
@@ -1078,7 +1092,10 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     stroke-width={1}
                     stroke-dasharray="4,2"
                   />
-                  <Show when={td().e.overallRating !== null}>
+                  <Show
+                    when={props.dataShown.overallRating &&
+                      td().e.overallRating !== null}
+                  >
                     <circle
                       cx={td().x}
                       cy={yScale(td().e.overallRating!)}
@@ -1089,7 +1106,9 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                       stroke-width={1.5}
                     />
                   </Show>
-                  <Show when={td().e.myRating !== null}>
+                  <Show
+                    when={props.dataShown.myRating && td().e.myRating !== null}
+                  >
                     <circle
                       cx={td().x}
                       cy={yScale(td().e.myRating!)}
@@ -1113,7 +1132,12 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             // 从右向左排列，间距基于最大点半径 + 文本宽度
             const slotWidth = 2 * POINT_MAX_RADIUS + 24;
             return (
-              <g style={{ "pointer-events": "none" }}>
+              <g
+                style={{ "pointer-events": "none" }}
+                visibility={props.dataShown.overallRating
+                  ? "visible"
+                  : "hidden"}
+              >
                 <text
                   x={legendRight}
                   y={labelY}
@@ -1197,7 +1221,10 @@ export const SubjectEpisodeRatingsLineChart: Component<{
               <div style={{ "font-weight": "bold", "margin-bottom": "4px" }}>
                 {td().e.date}
               </div>
-              <Show when={td().e.overallRating !== null}>
+              <Show
+                when={props.dataShown.overallRating &&
+                  td().e.overallRating !== null}
+              >
                 <div>
                   <span
                     style={{
@@ -1216,7 +1243,10 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   </span>
                 </div>
               </Show>
-              <Show when={td().e.overallRating === null}>
+              <Show
+                when={props.dataShown.overallRating &&
+                  td().e.overallRating === null}
+              >
                 <div style={{ opacity: 0.6 }}>
                   <span
                     style={{
@@ -1233,7 +1263,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   整体评分：暂无
                 </div>
               </Show>
-              <Show when={td().e.myRating !== null}>
+              <Show when={props.dataShown.myRating && td().e.myRating !== null}>
                 <div>
                   <span
                     style={{
@@ -1249,7 +1279,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   我的评分：{td().e.myRating!.toFixed(0)}
                 </div>
               </Show>
-              <Show when={td().e.myRating === null}>
+              <Show when={props.dataShown.myRating && td().e.myRating === null}>
                 <div style={{ opacity: 0.6 }}>
                   <span
                     style={{
@@ -1288,7 +1318,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
         <span>
           评分人数合计 {votesStats().total} ·{" "}
           {votesStats().allRated ? "每集平均评分数" : "有评分剧集平均评分数"}
-          {" "}{votesStats().avg.toFixed(1)}
+          {" "}
+          {votesStats().avg.toFixed(1)}
         </span>
         <span>
           滚轮/双指缩放 · 拖动平移 · 当前缩放{" "}
@@ -1303,6 +1334,63 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             {zoom().toFixed(1)}
           </span>x
         </span>
+      </div>
+
+      {/* 数据显示开关 */}
+      <div
+        style={{
+          display: "flex",
+          "justify-content": "flex-start",
+          gap: "12px",
+          "margin-top": "8px",
+          "font-size": "12px",
+          color: colors().text,
+        }}
+      >
+        <label
+          style={{
+            display: "inline-flex",
+            "align-items": "center",
+            gap: "4px",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={props.dataShown.overallRating}
+            onChange={(ev) => {
+              const checked = ev.currentTarget.checked;
+              props.setDataShown((prev) => ({
+                ...prev,
+                overallRating: checked,
+              }));
+            }}
+            style={{ margin: 0 }}
+          />
+          整体
+        </label>
+        <label
+          style={{
+            display: "inline-flex",
+            "align-items": "center",
+            gap: "4px",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={props.dataShown.myRating}
+            onChange={(ev) => {
+              const checked = ev.currentTarget.checked;
+              props.setDataShown((prev) => ({
+                ...prev,
+                myRating: checked,
+              }));
+            }}
+            style={{ margin: 0 }}
+          />
+          我的
+        </label>
       </div>
     </div>
   );
