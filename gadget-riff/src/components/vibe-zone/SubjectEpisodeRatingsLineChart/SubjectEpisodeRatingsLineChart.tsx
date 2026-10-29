@@ -317,6 +317,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
     return PADDING_TOP + (1 - ratio) * innerHeight();
   };
 
+  const episodeTitleY = () => yScale(Y_MIN) - 4;
+
   // 生成折线 path：按 dataPoints 顺序连接相邻有效点，遇 null 断开
   const buildPath = (getValue: (e: EpisodeInfo) => number | null) => {
     const eps = episodes();
@@ -808,6 +810,14 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                 height={CHART_HEIGHT}
               />
             </clipPath>
+            <clipPath id="impossible-rating-band-clip">
+              <rect
+                x={PADDING_LEFT}
+                y={yScale(1)}
+                width={innerWidth()}
+                height={yScale(0) - yScale(1)}
+              />
+            </clipPath>
           </defs>
           <rect
             x={PADDING_LEFT}
@@ -816,6 +826,36 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             height={yScale(0) - yScale(1)}
             fill="url(#impossible-rating-hatch)"
           />
+          {/* 在文字轮廓周围覆盖背景色，且仅影响 0～1 分区域 */}
+          <g
+            clip-path="url(#impossible-rating-band-clip)"
+            pointer-events="none"
+            aria-hidden="true"
+          >
+            <Index each={visibleEpisodeIndices()}>
+              {(i) => {
+                const ep = () => episodes()[i()];
+                const x = () => xScale(ep().visualTimestamp) + 4;
+                return (
+                  <text
+                    x={x()}
+                    y={episodeTitleY()}
+                    transform={`rotate(-90, ${x()}, ${episodeTitleY()})`}
+                    text-anchor="start"
+                    font-size="10"
+                    font-weight="bold"
+                    fill={colors().bg}
+                    stroke={colors().bg}
+                    stroke-width="4"
+                    stroke-linejoin="round"
+                    paint-order="stroke"
+                  >
+                    {ep().title ?? ""}
+                  </text>
+                );
+              }}
+            </Index>
+          </g>
 
           {/* 水平网格线 + y 轴刻度（渐变色） */}
           <Index each={yTicks}>
@@ -928,8 +968,8 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                   />
                   <text
                     x={x() + 4}
-                    y={yScale(1) - 4}
-                    transform={`rotate(-90, ${x() + 4}, ${yScale(1) - 4})`}
+                    y={episodeTitleY()}
+                    transform={`rotate(-90, ${x() + 4}, ${episodeTitleY()})`}
                     text-anchor="start"
                     font-size="10"
                     fill={titleFill()}
