@@ -924,6 +924,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
                     stroke={colors().guide}
                     stroke-width={1}
                     stroke-dasharray="2,3"
+                    pointer-events="none"
                   />
                   <text
                     x={x() + 4}
@@ -1027,7 +1028,7 @@ export const SubjectEpisodeRatingsLineChart: Component<{
             {/* hover 游标线 */}
             <Show when={tooltipData()}>
               {(td) => (
-                <g>
+                <g style={{ "pointer-events": "none" }}>
                   <line
                     x1={td().x}
                     y1={PADDING_TOP}
