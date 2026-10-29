@@ -1290,7 +1290,19 @@ export const SubjectEpisodeRatingsLineChart: Component<{
           {votesStats().allRated ? "每集平均评分数" : "有评分剧集平均评分数"}
           {" "}{votesStats().avg.toFixed(1)}
         </span>
-        <span>滚轮/双指缩放 · 拖动平移 · 当前缩放 {zoom().toFixed(1)}x</span>
+        <span>
+          滚轮/双指缩放 · 拖动平移 · 当前缩放{" "}
+          <span
+            style={{
+              display: "inline-block",
+              width: `${MAX_ZOOM.toFixed(1).length}ch`,
+              "font-family": "monospace",
+              "text-align": "right",
+            }}
+          >
+            {zoom().toFixed(1)}
+          </span>x
+        </span>
       </div>
     </div>
   );
