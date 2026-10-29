@@ -84,6 +84,13 @@ const SettingsTab: Component<{ ctx: PrimalContext }> = (props) => {
         <h2 class="title">时间线</h2>
         <SectionTimelineTabButtonLocation ctx={props.ctx} status={status()} />
       </div>
+      <div class="section">
+        <h2 class="title">单集评分折线图</h2>
+        <SectionSubjectEpisodeRatingsLineChartDataShownOnOpen
+          ctx={props.ctx}
+          status={status()}
+        />
+      </div>
     </div>
   );
 };
@@ -371,6 +378,34 @@ const SectionMusicSubjectPageTrackListRaterStyle: Component<{
             .getMusicSubjectPageTrackListRaterStyleValueLabelText(value)}
         setValue={(v) =>
           props.ctx.settingsStore.updateMusicSubjectPageTrackListRaterStyle(v)}
+      />
+    </DisableableSection>
+  );
+};
+
+const SectionSubjectEpisodeRatingsLineChartDataShownOnOpen: Component<{
+  ctx: PrimalContext;
+  status: SettingsStatus;
+}> = (props) => {
+  const optSubjectEpisodeRatingsLineChartDataShownOnOpen = props.ctx
+    .settingsStore
+    .getSubjectEpisodeRatingsLineChartDataShownOnOpenSignal();
+
+  return (
+    <DisableableSection disabled={!!props.status.saving}>
+      <h3 class="title">打开时默认显示的数据</h3>
+      <RadioGroup
+        currentValue={optSubjectEpisodeRatingsLineChartDataShownOnOpen()}
+        options={props.ctx.settingsStore
+          .getSubjectEpisodeRatingsLineChartDataShownOnOpenValues()}
+        getLabel={(value) =>
+          props.ctx.settingsStore
+            .getSubjectEpisodeRatingsLineChartDataShownOnOpenValueLabelText(
+              value,
+            )}
+        setValue={(v) =>
+          props.ctx.settingsStore
+            .updateSubjectEpisodeRatingsLineChartDataShownOnOpen(v)}
       />
     </DisableableSection>
   );

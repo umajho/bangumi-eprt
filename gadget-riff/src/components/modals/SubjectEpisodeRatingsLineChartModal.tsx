@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createMemo, createSignal, Show, untrack } from "solid-js";
 import { render } from "solid-js/web";
 
 import type { Context } from "../../context";
@@ -23,21 +23,30 @@ export interface SubjectEpisodeRatingsLineChartModalInstance {
 
 let instance: SubjectEpisodeRatingsLineChartModalInstance | null = null;
 
-const DATA_SHOWN_DEFAULT: DataShown = Object.freeze({
-  overallRating: true,
-  myRating: true,
-});
-
 export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
   ctx: Context,
 ) {
   return instance ??= ((): SubjectEpisodeRatingsLineChartModalInstance => {
+    const dataShownDefaultRaw = ctx.settingsStore
+      .getSubjectEpisodeRatingsLineChartDataShownOnOpenSignal();
+    const dataShownDefault = createMemo(() => {
+      switch (dataShownDefaultRaw()) {
+        case "overall":
+          return { overallRating: true, myRating: false };
+        case "my":
+          return { overallRating: false, myRating: true };
+        case "overall+my":
+        default:
+          return { overallRating: true, myRating: true };
+      }
+    });
+
     const wrapper = document.createElement("div");
     document.body.appendChild(wrapper);
 
     const [opts, setOpts] = createSignal<Options | null>(null);
     const [dataShown, setDataShown] = //
-      createSignal<DataShown>(DATA_SHOWN_DEFAULT);
+      createSignal<DataShown>(untrack(dataShownDefault));
 
     render(() => {
       // oxlint-disable-next-line no-unassigned-vars
@@ -99,7 +108,7 @@ export function getSubjectEpisodeRatingsLineChartModalSingletonInstance(
     return {
       open(opts) {
         setOpts(opts);
-        setDataShown(DATA_SHOWN_DEFAULT);
+        setDataShown(untrack(dataShownDefault));
         dialogEl.showModal();
       },
       close() {

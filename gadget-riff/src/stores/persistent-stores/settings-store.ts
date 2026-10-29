@@ -15,6 +15,10 @@ type SettingTimelineTabButtonLocation = "more-dropdown" | "main-row";
 type SettingEpisodePageOverviewStyle = "boxed" | "compact";
 type SettingMusicSubjectPageTrackListRaterDisplay = "show" | "hide" | "switch";
 type SettingMusicSubjectPageTrackListRaterStyle = "direct" | "compact";
+type SettingSubjectEpisodeRatingsLineChartDataShownOnOpen =
+  | "overall+my"
+  | "overall"
+  | "my";
 
 export interface SettingsStatus {
   ready?: true;
@@ -31,6 +35,8 @@ export interface Settings {
     SettingMusicSubjectPageTrackListRaterDisplay;
   musicSubjectPageTrackListRaterStyle?:
     SettingMusicSubjectPageTrackListRaterStyle;
+  subjectEpisodeRatingsLineChartDataShownOnOpen?:
+    SettingSubjectEpisodeRatingsLineChartDataShownOnOpen;
 }
 
 const DEFAULT_SETTINGS: Required<Settings> = {
@@ -40,6 +46,7 @@ const DEFAULT_SETTINGS: Required<Settings> = {
   episodePageOverviewStyle: "boxed",
   musicSubjectPageTrackListRaterDisplay: "show",
   musicSubjectPageTrackListRaterStyle: "direct",
+  subjectEpisodeRatingsLineChartDataShownOnOpen: "overall+my",
 };
 
 export function createSettingsStore() {
@@ -209,6 +216,31 @@ export function createSettingsStore() {
         DEFAULT_SETTINGS.musicSubjectPageTrackListRaterStyle;
   }
 
+  function updateSubjectEpisodeRatingsLineChartDataShownOnOpen(
+    value: SettingSubjectEpisodeRatingsLineChartDataShownOnOpen,
+  ) {
+    update("subjectEpisodeRatingsLineChartDataShownOnOpen", value);
+  }
+  function getSubjectEpisodeRatingsLineChartDataShownOnOpenValues(): SettingSubjectEpisodeRatingsLineChartDataShownOnOpen[] {
+    return ["overall+my", "overall", "my"];
+  }
+  function getSubjectEpisodeRatingsLineChartDataShownOnOpenValueLabelText(
+    value: SettingSubjectEpisodeRatingsLineChartDataShownOnOpen,
+  ): string {
+    return {
+      "overall+my": "整体+我的",
+      "overall": "整体",
+      "my": "我的",
+    }[value];
+  }
+  function getSubjectEpisodeRatingsLineChartDataShownOnOpenSignal(): Accessor<
+    SettingSubjectEpisodeRatingsLineChartDataShownOnOpen
+  > {
+    return () =>
+      store.subjectEpisodeRatingsLineChartDataShownOnOpen ??
+        DEFAULT_SETTINGS.subjectEpisodeRatingsLineChartDataShownOnOpen;
+  }
+
   return {
     getStatusSignal: () => status,
     updateAntiSpoiler,
@@ -235,6 +267,10 @@ export function createSettingsStore() {
     getMusicSubjectPageTrackListRaterStyleValues,
     getMusicSubjectPageTrackListRaterStyleValueLabelText,
     getMusicSubjectPageTrackListRaterStyleSignal,
+    updateSubjectEpisodeRatingsLineChartDataShownOnOpen,
+    getSubjectEpisodeRatingsLineChartDataShownOnOpenValues,
+    getSubjectEpisodeRatingsLineChartDataShownOnOpenValueLabelText,
+    getSubjectEpisodeRatingsLineChartDataShownOnOpenSignal,
   };
 }
 
